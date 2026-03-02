@@ -79,6 +79,9 @@ ml:
 reconstruction:
   image_height: 64
   image_width: 128
+  methods: [parametric_inverse, latent_ridge]
+  param_n_estimators: 600
+  param_min_samples_leaf: 1
   latent_dim: 48
   ridge_alpha: 1.2
   obstacle_threshold: 0.8

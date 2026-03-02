@@ -19,6 +19,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from sim.config import load_config, repo_root  # noqa: E402
 from sim.geometry_mask import render_case_image  # noqa: E402
+from ml.reconstruct import predict_reconstruction_images  # noqa: E402
 
 
 META_COLS = ["case_id", "shape", "Re", "dy", "eps", "seed"]
@@ -155,14 +156,36 @@ def main() -> None:
     with recon_model_path.open("rb") as handle:
         rec_pack = pickle.load(handle)
 
-    scaler = rec_pack["scaler"]
-    pca_y = rec_pack["pca_y"]
-    reg = rec_pack["regressor"]
+    recon_method = str(rec_pack.get("method", "latent_ridge"))
     threshold = float(rec_pack.get("threshold", 0.8))
+    rec_feature_cols = rec_pack.get("feature_columns", feature_cols)
+    x_test_rec = features_df.iloc[idx_test][rec_feature_cols].to_numpy(dtype=float)
+
+    fitted_model = rec_pack.get("fitted_model")
+    if fitted_model is None:
+        if recon_method == "latent_ridge":
+            fitted_model = {
+                "scaler": rec_pack["scaler"],
+                "pca_y": rec_pack["pca_y"],
+                "regressor": rec_pack["regressor"],
+            }
+        elif recon_method == "parametric_inverse":
+            fitted_model = {
+                "classifier": rec_pack["classifier"],
+                "param_regressor": rec_pack["param_regressor"],
+            }
+        else:
+            raise ValueError(f"Unsupported reconstruction method in model pack: {recon_method}")
 
     y_test_target = y_target_img[idx_test].reshape(len(idx_test), -1)
-    z_pred = reg.predict(scaler.transform(x_test))
-    y_pred_flat = np.clip(pca_y.inverse_transform(z_pred), 0.0, 1.0)
+    y_pred_flat, _ = predict_reconstruction_images(
+        method=recon_method,
+        fitted_model=fitted_model,
+        x_test=x_test_rec,
+        cfg=cfg,
+        image_height=h_img,
+        image_width=w_img,
+    )
 
     mse = float(np.mean((y_test_target - y_pred_flat) ** 2))
     ious = []
@@ -249,7 +272,7 @@ def main() -> None:
 
     dummy_c = fig.add_subplot(outer[1, 0])
     dummy_c.axis("off")
-    dummy_c.set_title("C. Geometry Reconstruction: Target vs Predicted", y=1.04)
+    dummy_c.set_title(f"C. Geometry Reconstruction ({recon_method}): Target vs Predicted", y=1.04)
 
     ax_d = fig.add_subplot(outer[1, 1])
     eps_abs = np.abs(eps_test)
@@ -316,6 +339,7 @@ def main() -> None:
             "macro_f1": cls_f1,
         },
         "reconstruction": {
+            "method": recon_method,
             "mse": mse,
             "iou_mean": rec_iou_mean,
             "dice_mean": rec_dice_mean,
