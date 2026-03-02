@@ -2,6 +2,48 @@
 
 可复现实验仓库：在 2D 通道流中用出口截面探针速度 `u(t)` 识别上游障碍物形状（`circle/square/triangle`）。
 
+## TL;DR
+
+- 分类：`SVC(RBF)` 在 `exp_180` 上 repeated holdout `acc=0.9944±0.0111`，`macroF1=0.9944±0.0111`
+- 重建：`parametric_inverse`（先反演 `shape/dy/eps` 再几何渲染）相对 `latent_ridge` 显著提升，IoU 从 `0.7302` 提升到 `0.9579`
+- 全流程可复现：`make dataset && make sota && make reconstruct && make figure`
+
+## 当前算法（你问的“基于什么算法”）
+
+- 分类分支：
+  `rf / extratrees / svc_rbf / hard_vote` 候选模型对比，自动选择最优模型并保存到 `models/sota.pkl`
+- 重建分支：
+  双方法 A/B 测试并自动择优
+  1. `latent_ridge`：`PCA + Ridge` 直接像素回归（旧基线）
+  2. `parametric_inverse`：`ExtraTreesClassifier(shape)` + `ExtraTreesRegressor(dy, eps)`，再调用几何渲染器生成图像（当前最优）
+
+## 效果与可信度（你问的“怎么确保效果”）
+
+数据配置：`configs/exp_180.yaml`（180 cases，按 `(shape, Re)` 分层切分，5 个随机种子重复）
+
+### 分类结果（`reports/sota_summary.md`）
+
+| Metric | Value |
+|---|---|
+| Holdout (seed=42) accuracy | `1.0000` |
+| Holdout (seed=42) macro F1 | `1.0000` |
+| Repeated holdout accuracy | `0.9944 ± 0.0111` |
+| Repeated holdout macro F1 | `0.9944 ± 0.0111` |
+| Leave-One-Re-Out worst acc | `0.8333` (Re=100) |
+
+### 重建结果（`reports/reconstruction_summary.md`）
+
+| Method | IoU (mean±std) | Dice (mean±std) | MSE (mean±std) |
+|---|---|---|---|
+| `parametric_inverse` | `0.9579 ± 0.0063` | `0.9774 ± 0.0036` | `3.23e-4 ± 4.88e-5` |
+| `latent_ridge` | `0.7302 ± 0.0159` | `0.8399 ± 0.0101` | `5.59e-4 ± 4.76e-5` |
+
+已做的稳健性与泛化检查：
+- 重复 holdout（多种子）而不是单次结果
+- Leave-One-Re-Out（跨 Re 泛化）
+- `|eps|` 扰动 sweep 曲线（鲁棒性）
+- 同数据同切分下的新旧方法 A/B 对照
+
 ## Visual Preview
 
 ![Pipeline overview GIF](reports/pipeline_overview.gif)
@@ -35,10 +77,6 @@ Reconstruction quality vs outlet perturbation (`IoU` vs `|eps|`):
 Method comparison (`parametric_inverse` vs `latent_ridge`):
 
 ![Reconstruction method comparison](reports/reconstruction_method_comparison.png)
-
-当前 `configs/exp_180.yaml` 的重建结果（seed=42 holdout）：
-- `parametric_inverse`: `IoU=0.9671`, `Dice=0.9826`, `MSE=2.55e-4`
-- `latent_ridge`（旧方法）: repeated holdout `IoU≈0.7302`, `Dice≈0.8399`
 
 后端支持：
 - `synthetic`（默认）：合成非定常尾迹信号，保证无 CFD 环境也能完整跑通。
