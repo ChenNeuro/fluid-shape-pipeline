@@ -1,7 +1,7 @@
 {
   "solver": "synthetic",
-  "total_cases": 180,
-  "success_cases": 180,
+  "total_cases": 360,
+  "success_cases": 360,
   "failed_cases": 0,
   "failure_rate": 0.0,
   "manifest": "/Users/chenyihao/Desktop/\u5927\u4e09\u4e0b/\u8bfe\u7a0b/\u6d41\u4f53\u529b\u5b66\u5b9e\u9a8c/fluid-shape-pipeline/data/raw/manifest.csv",

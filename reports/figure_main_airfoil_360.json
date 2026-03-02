@@ -1,0 +1,24 @@
+{
+  "config": "configs/exp_360_airfoil.yaml",
+  "output_png": "/Users/chenyihao/Desktop/\u5927\u4e09\u4e0b/\u8bfe\u7a0b/\u6d41\u4f53\u529b\u5b66\u5b9e\u9a8c/fluid-shape-pipeline/reports/figure_main_airfoil_360.png",
+  "output_pdf": "/Users/chenyihao/Desktop/\u5927\u4e09\u4e0b/\u8bfe\u7a0b/\u6d41\u4f53\u529b\u5b66\u5b9e\u9a8c/fluid-shape-pipeline/reports/figure_main_airfoil_360.pdf",
+  "n_cases": 360,
+  "holdout_n": 72,
+  "seed": 42,
+  "commit": "609d16f",
+  "classification": {
+    "accuracy": 0.9722222222222222,
+    "macro_f1": 0.9721362229102167
+  },
+  "reconstruction": {
+    "method": "parametric_inverse",
+    "mse": 0.00024568345811631947,
+    "iou_mean": 0.9404046851083349,
+    "dice_mean": 0.962801209869651
+  },
+  "example_case_ids": [
+    "airfoil_Re300_p07",
+    "airfoil_Re100_p10",
+    "square_Re300_p04"
+  ]
+}

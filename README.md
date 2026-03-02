@@ -4,9 +4,10 @@
 
 ## TL;DR
 
-- 分类：`SVC(RBF)` 在 `exp_180` 上 repeated holdout `acc=0.9944±0.0111`，`macroF1=0.9944±0.0111`
-- 重建：`parametric_inverse`（先反演 `shape/dy/eps` 再几何渲染）相对 `latent_ridge` 显著提升，IoU 从 `0.7302` 提升到 `0.9579`
-- 全流程可复现：`make dataset && make sota && make reconstruct && make figure`
+- 已完成大实验：`configs/exp_360_airfoil.yaml`，总计 `360 cases`（`circle/square/triangle/airfoil`）
+- 分类：`SVC(RBF)` repeated holdout `acc=0.9861±0.0124`，seed=42 holdout `acc=0.9722`
+- 重建：`parametric_inverse` repeated holdout `IoU=0.9340±0.0099`，seed=42 holdout `IoU=0.9404`
+- 全流程可复现：`python -m sim.generate_dataset --config configs/exp_360_airfoil.yaml` 后续接 `train_sota/reconstruct/figure`
 
 ## 当前算法（你问的“基于什么算法”）
 
@@ -19,24 +20,24 @@
 
 ## 效果与可信度（你问的“怎么确保效果”）
 
-数据配置：`configs/exp_180.yaml`（180 cases，按 `(shape, Re)` 分层切分，5 个随机种子重复）
+数据配置：`configs/exp_360_airfoil.yaml`（360 cases，按 `(shape, Re)` 分层切分，5 个随机种子重复）
 
 ### 分类结果（`reports/sota_summary.md`）
 
 | Metric | Value |
 |---|---|
-| Holdout (seed=42) accuracy | `1.0000` |
-| Holdout (seed=42) macro F1 | `1.0000` |
-| Repeated holdout accuracy | `0.9944 ± 0.0111` |
-| Repeated holdout macro F1 | `0.9944 ± 0.0111` |
-| Leave-One-Re-Out worst acc | `0.8333` (Re=100) |
+| Holdout (seed=42) accuracy | `0.9722` |
+| Holdout (seed=42) macro F1 | `0.9721` |
+| Repeated holdout accuracy | `0.9861 ± 0.0124` |
+| Repeated holdout macro F1 | `0.9861 ± 0.0125` |
+| Leave-One-Re-Out worst acc | `0.8750` (Re=100) |
 
 ### 重建结果（`reports/reconstruction_summary.md`）
 
 | Method | IoU (mean±std) | Dice (mean±std) | MSE (mean±std) |
 |---|---|---|---|
-| `parametric_inverse` | `0.9579 ± 0.0063` | `0.9774 ± 0.0036` | `3.23e-4 ± 4.88e-5` |
-| `latent_ridge` | `0.7302 ± 0.0159` | `0.8399 ± 0.0101` | `5.59e-4 ± 4.76e-5` |
+| `parametric_inverse` | `0.9340 ± 0.0099` | `0.9569 ± 0.0083` | `2.42e-4 ± 4.30e-5` |
+| `latent_ridge` | `0.4402 ± 0.0143` | `0.5541 ± 0.0159` | `7.06e-4 ± 2.10e-5` |
 
 已做的稳健性与泛化检查：
 - 重复 holdout（多种子）而不是单次结果
@@ -51,6 +52,10 @@
 ## Reproducible Main Figure (Publication Style)
 
 ![Reproducible main figure](reports/figure_main_reproducible.png)
+
+## Large Experiment Figure (With Airfoil)
+
+![Airfoil large experiment figure](reports/figure_main_airfoil_360.png)
 
 ## Result Comparison
 
@@ -156,6 +161,21 @@ make train CONFIG=configs/exp_180.yaml
 make reconstruct CONFIG=configs/exp_180.yaml
 ```
 
+### 大实验 + 机翼型（360 cases）
+
+```bash
+python -m sim.generate_dataset --config configs/exp_360_airfoil.yaml
+python -m extract.build_features --config configs/exp_360_airfoil.yaml
+python -m ml.train_sota --config configs/exp_360_airfoil.yaml
+python -m ml.reconstruct --config configs/exp_360_airfoil.yaml
+python scripts/make_publication_figure.py --config configs/exp_360_airfoil.yaml --output reports/figure_main_airfoil_360.png
+```
+
+该实验的归档报告：
+- `reports/summary_exp_360_airfoil.md`
+- `reports/sota_summary_exp_360_airfoil.md`
+- `reports/reconstruction_summary_exp_360_airfoil.md`
+
 ## 3. Required Outputs
 
 - Raw probe series: `data/raw/<case_id>/probes.csv`
@@ -186,6 +206,9 @@ make reconstruct CONFIG=configs/exp_180.yaml
   - `reports/reconstruction_method_leaderboard.csv`
   - `reports/reconstruction_repeats.csv`
   - `reports/reconstruction_summary.md`
+  - `reports/figure_main_airfoil_360.png`
+  - `reports/figure_main_airfoil_360.pdf`
+  - `reports/figure_main_airfoil_360.json`
 
 ## 4. Data Schema
 

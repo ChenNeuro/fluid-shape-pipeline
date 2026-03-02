@@ -4,3 +4,5 @@
 2026-03-02 23:38:57,322 | INFO | reconstruct | Reconstruction done. method=parametric_inverse mse=0.000255 iou=0.9671 dice=0.9826 model=/Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/models/reconstructor.pkl
 2026-03-02 23:39:57,825 | INFO | reconstruct | Selected best reconstruction method: parametric_inverse
 2026-03-02 23:40:02,577 | INFO | reconstruct | Reconstruction done. method=parametric_inverse mse=0.000255 iou=0.9671 dice=0.9826 model=/Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/models/reconstructor.pkl
+2026-03-02 23:56:07,248 | INFO | reconstruct | Selected best reconstruction method: parametric_inverse
+2026-03-02 23:56:15,267 | INFO | reconstruct | Reconstruction done. method=parametric_inverse mse=0.000246 iou=0.9404 dice=0.9628 model=/Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/models/reconstructor.pkl
