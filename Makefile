@@ -24,6 +24,9 @@ dataset:
 train:
 	$(PYTHON) -m ml.train --config $(CONFIG)
 
+sota:
+	$(PYTHON) -m ml.train_sota --config $(CONFIG)
+
 report: train
 
 clean:

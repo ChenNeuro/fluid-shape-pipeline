@@ -1,0 +1,1 @@
+2026-03-02 18:43:28,110 | INFO | train_sota | SOTA candidate training done. best=hard_vote_ensemble acc=1.0000 macro_f1=1.0000 model=/Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/models/sota.pkl

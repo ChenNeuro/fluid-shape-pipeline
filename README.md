@@ -33,6 +33,12 @@ make dataset
 make train
 ```
 
+### Train SOTA candidate (model search + best model export)
+
+```bash
+make sota
+```
+
 ### 45-case 扩展实验
 
 ```bash
@@ -55,6 +61,7 @@ make train CONFIG=configs/challenging_45.yaml
 - Metadata index: `data/raw/index.csv`
 - Features table: `data/features/features.csv`
 - Model: `models/baseline.pkl`
+- SOTA candidate model (best from model search): `models/sota.pkl`
 - Reports:
   - `reports/separability_pca.png`
   - `reports/spectra_examples.png`
@@ -63,6 +70,11 @@ make train CONFIG=configs/challenging_45.yaml
   - `reports/holdout_stability.png`
   - `reports/holdout_repeats.csv`
   - `reports/summary.md`
+  - `reports/model_leaderboard.csv`
+  - `reports/sota_repeats.csv`
+  - `reports/confusion_matrix_sota.png`
+  - `reports/robustness_sweep_sota.png`
+  - `reports/sota_summary.md`
 
 ## 4. Data Schema
 
