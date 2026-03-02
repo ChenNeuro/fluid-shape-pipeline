@@ -1,0 +1,41 @@
+{
+  "best_model": "hard_vote_ensemble",
+  "holdout_metrics": {
+    "accuracy": 1.0,
+    "macro_f1": 1.0
+  },
+  "leaderboard_top": [
+    {
+      "model": "hard_vote_ensemble",
+      "n_repeats": 5,
+      "accuracy_mean": 0.9777777777777779,
+      "accuracy_std": 0.04444444444444447,
+      "macro_f1_mean": 0.9771428571428572,
+      "macro_f1_std": 0.04571428571428573
+    },
+    {
+      "model": "rf",
+      "n_repeats": 5,
+      "accuracy_mean": 0.9555555555555555,
+      "accuracy_std": 0.054433105395181765,
+      "macro_f1_mean": 0.9542857142857143,
+      "macro_f1_std": 0.05598833697790123
+    },
+    {
+      "model": "svc_rbf",
+      "n_repeats": 5,
+      "accuracy_mean": 0.9555555555555555,
+      "accuracy_std": 0.054433105395181765,
+      "macro_f1_mean": 0.9542857142857143,
+      "macro_f1_std": 0.05598833697790123
+    },
+    {
+      "model": "extratrees",
+      "n_repeats": 5,
+      "accuracy_mean": 0.9333333333333332,
+      "accuracy_std": 0.054433105395181765,
+      "macro_f1_mean": 0.9314285714285713,
+      "macro_f1_std": 0.05598833697790123
+    }
+  ]
+}
