@@ -14,6 +14,8 @@ DEFAULT_FRAMES = [
     ("holdout_stability.png", "Multi-Seed Holdout Stability"),
     ("confusion_matrix_sota.png", "SOTA Candidate Confusion Matrix"),
     ("robustness_sweep_sota.png", "SOTA Candidate Robustness Sweep"),
+    ("reconstruction_examples.png", "Geometry Reconstruction Examples"),
+    ("reconstruction_iou_vs_eps.png", "Reconstruction IoU vs Perturbation"),
 ]
 
 

@@ -1,0 +1,97 @@
+project:
+  seed: 20260302
+  solver: synthetic
+
+simulation:
+  H: 1.0
+  d_ratio: 0.2
+  x0: 3.0
+  y0: 0.5
+  L_in: 5.0
+  L_out: 5.0
+  density: 1.0
+  U_mean: 1.0
+  re_values: [100, 200, 300]
+  shapes: [circle, square, triangle]
+  perturbations_per_combo: 20
+  probes_n: 32
+  workers: 0
+  max_retries: 2
+
+  perturb:
+    enable_dy: true
+    dy_min: -0.04
+    dy_max: 0.04
+    enable_eps: true
+    eps_max: 0.05
+
+  time:
+    cfl_target: 0.5
+    dt: 0.01
+    transient_time: 8.0
+    transient_cycles: 8
+    min_cycles: 20
+    min_samples: 2000
+
+  synthetic:
+    noise_std: 0.035
+    shape_params:
+      circle:
+        st: 0.20
+        amp: 0.17
+        h2: 0.26
+        h3: 0.11
+        phase_gradient: 2.4
+      square:
+        st: 0.17
+        amp: 0.19
+        h2: 0.31
+        h3: 0.16
+        phase_gradient: 2.8
+      triangle:
+        st: 0.22
+        amp: 0.17
+        h2: 0.24
+        h3: 0.14
+        phase_gradient: 2.2
+    challenge:
+      enabled: true
+      freq_jitter_std: 0.10
+      amp_jitter_std: 0.18
+      noise_multiplier: 1.6
+      common_mode_amp: 0.10
+      common_mode_freq_ratio: 0.85
+      drift_amp: 0.05
+      drift_freq_ratio: 0.07
+      probe_mix: 0.20
+      dropout_prob: 0.008
+      dropout_std: 0.08
+
+openfoam:
+  template_dir: sim/templates/openfoam_case
+  case_root: runs/openfoam
+  mesh_cmds: [blockMesh]
+  solver_cmd: pimpleFoam
+  write_interval: 0.1
+
+features:
+  fft_bands: 6
+  pod_modes: 5
+  add_pod: true
+
+ml:
+  test_size: 0.2
+  random_state: 42
+  repeat_seeds: [40, 41, 42, 43, 44]
+  n_estimators: 400
+  cv_folds: 5
+  robustness_bins: 6
+  perm_repeats: 20
+
+reconstruction:
+  image_height: 64
+  image_width: 128
+  latent_dim: 64
+  ridge_alpha: 1.0
+  obstacle_threshold: 0.8
+  repeat_seeds: [40, 41, 42, 43, 44]

@@ -75,3 +75,11 @@ ml:
   cv_folds: 5
   robustness_bins: 6
   perm_repeats: 20
+
+reconstruction:
+  image_height: 64
+  image_width: 128
+  latent_dim: 48
+  ridge_alpha: 1.2
+  obstacle_threshold: 0.8
+  repeat_seeds: [40, 41, 42, 43, 44]

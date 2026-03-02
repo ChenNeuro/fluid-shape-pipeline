@@ -6,6 +6,32 @@
 
 ![Pipeline overview GIF](reports/pipeline_overview.gif)
 
+## Reproducible Main Figure (Publication Style)
+
+![Reproducible main figure](reports/figure_main_reproducible.png)
+
+## Result Comparison
+
+### A) Classification (真实标签 vs 预测结果)
+
+Baseline confusion matrix:
+
+![Baseline confusion matrix](reports/confusion_matrix.png)
+
+SOTA candidate confusion matrix:
+
+![SOTA confusion matrix](reports/confusion_matrix_sota.png)
+
+### B) Reconstruction (目标几何图像 vs 重建图像)
+
+Ground truth / Prediction / Absolute error examples:
+
+![Reconstruction examples](reports/reconstruction_examples.png)
+
+Reconstruction quality vs outlet perturbation (`IoU` vs `|eps|`):
+
+![Reconstruction IoU vs eps](reports/reconstruction_iou_vs_eps.png)
+
 后端支持：
 - `synthetic`（默认）：合成非定常尾迹信号，保证无 CFD 环境也能完整跑通。
 - `openfoam`：OpenFOAM 自动化适配层（模板 + 命令封装 + probes 解析）。
@@ -43,10 +69,22 @@ make train
 make sota
 ```
 
+### Geometry image reconstruction (inverse problem)
+
+```bash
+make reconstruct
+```
+
 ### Build preview GIF
 
 ```bash
 make gif
+```
+
+### Build publication main figure
+
+```bash
+make figure CONFIG=configs/exp_180.yaml
 ```
 
 ### 45-case 扩展实验
@@ -61,6 +99,15 @@ make train CONFIG=configs/exp_45.yaml
 ```bash
 make dataset CONFIG=configs/challenging_45.yaml
 make train CONFIG=configs/challenging_45.yaml
+make reconstruct CONFIG=configs/challenging_45.yaml
+```
+
+### 更大规模实验（180 cases）
+
+```bash
+make dataset CONFIG=configs/exp_180.yaml
+make train CONFIG=configs/exp_180.yaml
+make reconstruct CONFIG=configs/exp_180.yaml
 ```
 
 ## 3. Required Outputs
@@ -72,6 +119,7 @@ make train CONFIG=configs/challenging_45.yaml
 - Features table: `data/features/features.csv`
 - Model: `models/baseline.pkl`
 - SOTA candidate model (best from model search): `models/sota.pkl`
+- Reconstruction model: `models/reconstructor.pkl`
 - Reports:
   - `reports/pipeline_overview.gif`
   - `reports/separability_pca.png`
@@ -86,6 +134,10 @@ make train CONFIG=configs/challenging_45.yaml
   - `reports/confusion_matrix_sota.png`
   - `reports/robustness_sweep_sota.png`
   - `reports/sota_summary.md`
+  - `reports/reconstruction_examples.png`
+  - `reports/reconstruction_iou_vs_eps.png`
+  - `reports/reconstruction_repeats.csv`
+  - `reports/reconstruction_summary.md`
 
 ## 4. Data Schema
 

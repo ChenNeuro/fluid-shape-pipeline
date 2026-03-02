@@ -15,7 +15,7 @@ else
   SOLVER_ARG := --solver $(SOLVER)
 endif
 
-.PHONY: dataset train sota gif report clean
+.PHONY: dataset train sota reconstruct figure gif report clean
 
 dataset:
 	$(PYTHON) -m sim.generate_dataset --config $(CONFIG) $(SOLVER_ARG) $(WORKERS_ARG)
@@ -26,6 +26,12 @@ train:
 
 sota:
 	$(PYTHON) -m ml.train_sota --config $(CONFIG)
+
+reconstruct:
+	$(PYTHON) -m ml.reconstruct --config $(CONFIG)
+
+figure:
+	$(PYTHON) scripts/make_publication_figure.py --config $(CONFIG) --output reports/figure_main_reproducible.png
 
 gif:
 	$(PYTHON) scripts/make_report_gif.py --reports-dir reports --output reports/pipeline_overview.gif

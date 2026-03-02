@@ -1,0 +1,23 @@
+{
+  "config": "configs/exp_180.yaml",
+  "output_png": "/Users/chenyihao/Desktop/\u5927\u4e09\u4e0b/\u8bfe\u7a0b/\u6d41\u4f53\u529b\u5b66\u5b9e\u9a8c/fluid-shape-pipeline/reports/figure_main_reproducible.png",
+  "output_pdf": "/Users/chenyihao/Desktop/\u5927\u4e09\u4e0b/\u8bfe\u7a0b/\u6d41\u4f53\u529b\u5b66\u5b9e\u9a8c/fluid-shape-pipeline/reports/figure_main_reproducible.pdf",
+  "n_cases": 180,
+  "holdout_n": 36,
+  "seed": 42,
+  "commit": "e310cdf",
+  "classification": {
+    "accuracy": 1.0,
+    "macro_f1": 1.0
+  },
+  "reconstruction": {
+    "mse": 0.0005371757554629834,
+    "iou_mean": 0.7355501040378176,
+    "dice_mean": 0.8414130680710102
+  },
+  "example_case_ids": [
+    "triangle_Re200_p13",
+    "circle_Re300_p06",
+    "square_Re200_p15"
+  ]
+}
