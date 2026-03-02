@@ -99,8 +99,10 @@ reconstruction:
   image_width: 128
   methods: [parametric_inverse, latent_ridge]
   param_n_estimators: 1100
+  audit_n_estimators: 450
   param_min_samples_leaf: 1
   latent_dim: 64
   ridge_alpha: 1.0
   obstacle_threshold: 0.8
+  confidence_threshold: 0.45
   repeat_seeds: [40, 41, 42, 43, 44]

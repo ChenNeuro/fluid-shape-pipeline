@@ -1,0 +1,24 @@
+{
+  "config": "configs/exp_450_biggap.yaml",
+  "output_png": "/Users/chenyihao/Desktop/\u5927\u4e09\u4e0b/\u8bfe\u7a0b/\u6d41\u4f53\u529b\u5b66\u5b9e\u9a8c/fluid-shape-pipeline/reports/figure_main_biggap_450.png",
+  "output_pdf": "/Users/chenyihao/Desktop/\u5927\u4e09\u4e0b/\u8bfe\u7a0b/\u6d41\u4f53\u529b\u5b66\u5b9e\u9a8c/fluid-shape-pipeline/reports/figure_main_biggap_450.pdf",
+  "n_cases": 450,
+  "holdout_n": 90,
+  "seed": 42,
+  "commit": "7e10824",
+  "classification": {
+    "accuracy": 1.0,
+    "macro_f1": 1.0
+  },
+  "reconstruction": {
+    "method": "parametric_inverse",
+    "mse": 0.00017784288194444436,
+    "iou_mean": 0.9463097771159029,
+    "dice_mean": 0.9684749169916267
+  },
+  "example_case_ids": [
+    "airfoil_Re300_p02",
+    "diamond_Re300_p23",
+    "circle_Re200_p11"
+  ]
+}

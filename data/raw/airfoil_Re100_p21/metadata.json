@@ -3,15 +3,15 @@
   "backend": "synthetic",
   "shape": "airfoil",
   "Re": 100,
-  "dy": -0.024237918218220546,
-  "eps": -0.059259726508583944,
-  "seed": 1207251023,
+  "dy": -0.00769113360494568,
+  "eps": 0.019970538075522182,
+  "seed": 1890885670,
   "geometry": {
     "H": 1.0,
     "d": 0.2,
     "x0": 3.0,
     "y0_nominal": 0.5,
-    "y0_actual": 0.4757620817817795,
+    "y0_actual": 0.49230886639505433,
     "L_in": 5.0,
     "L_out": 5.0,
     "L_total": 10.0
@@ -59,15 +59,15 @@
   },
   "sampling": {
     "dt": 0.01,
-    "n_samples": 2140,
+    "n_samples": 3594,
     "t_start": 0.0,
-    "t_end": 21.39,
-    "transient_steps": 856,
-    "f0_est": 0.9349955670360081
+    "t_end": 35.93,
+    "transient_steps": 1438,
+    "f0_est": 0.5566297418872704
   },
   "synthetic_profile": {
     "challenge_enabled": true,
-    "noise_std": 0.0684
+    "noise_std": 0.05399999999999999
   },
   "files": {
     "probes_csv": "probes.csv"

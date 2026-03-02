@@ -3,3 +3,4 @@
 2026-03-02 18:30:51,545 | INFO | features | Feature extraction complete. rows=45 cols=335 -> /Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/data/features/features.csv
 2026-03-02 19:05:45,981 | INFO | features | Feature extraction complete. rows=180 cols=335 -> /Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/data/features/features.csv
 2026-03-02 23:54:12,579 | INFO | features | Feature extraction complete. rows=360 cols=335 -> /Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/data/features/features.csv
+2026-03-03 00:27:00,947 | INFO | features | Feature extraction complete. rows=450 cols=335 -> /Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/data/features/features.csv
