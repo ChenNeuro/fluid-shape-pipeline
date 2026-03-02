@@ -7,7 +7,13 @@
 - 已完成大实验：`configs/exp_360_airfoil.yaml`，总计 `360 cases`（`circle/square/triangle/airfoil`）
 - 分类：`SVC(RBF)` repeated holdout `acc=0.9861±0.0124`，seed=42 holdout `acc=0.9722`
 - 重建：`parametric_inverse` repeated holdout `IoU=0.9340±0.0099`，seed=42 holdout `IoU=0.9404`
+- 反模式匹配审计（120次置换）：`p=0.008264`，拒绝“纯模板匹配”假设
 - 全流程可复现：`python -m sim.generate_dataset --config configs/exp_360_airfoil.yaml` 后续接 `train_sota/reconstruct/figure`
+
+最新“放大形状差异”实验：`configs/exp_450_biggap.yaml`（`circle/triangle/airfoil/diamond/bar`，450 cases）
+- 分类（repeated holdout）：`0.9978±0.0044`
+- 重建（repeated holdout）：`IoU=0.9472±0.0050`, `mIoU3=0.9774±0.0020`
+- 置换审计（60次）：`p=0.016393`
 
 ## 当前算法（你问的“基于什么算法”）
 
@@ -17,6 +23,7 @@
   双方法 A/B 测试并自动择优
   1. `latent_ridge`：`PCA + Ridge` 直接像素回归（旧基线）
   2. `parametric_inverse`：`ExtraTreesClassifier(shape)` + `ExtraTreesRegressor(dy, eps)`，再调用几何渲染器生成图像（当前最优）
+  3. 置信度审计：输出 `shape_confidence`，并在 `reconstruction_sanity.md` 用阈值（默认 `0.45`）标记潜在不可信样本
 
 ## 效果与可信度（你问的“怎么确保效果”）
 
@@ -44,6 +51,8 @@
 - Leave-One-Re-Out（跨 Re 泛化）
 - `|eps|` 扰动 sweep 曲线（鲁棒性）
 - 同数据同切分下的新旧方法 A/B 对照
+- 重建 sanity 对照（aligned vs random-pair）与低质量尾部统计（见 `reports/reconstruction_sanity.md`）
+- 机器统计反模式匹配审计（置换检验 + 1NN模板检索 + 近重复检测，见 `reports/pattern_audit.md`）
 
 ## Visual Preview
 
@@ -56,6 +65,10 @@
 ## Large Experiment Figure (With Airfoil)
 
 ![Airfoil large experiment figure](reports/figure_main_airfoil_360.png)
+
+## Large Experiment Figure (Big Shape Gap)
+
+![Big-gap large experiment figure](reports/figure_main_biggap_450.png)
 
 ## Result Comparison
 
@@ -82,6 +95,14 @@ Reconstruction quality vs outlet perturbation (`IoU` vs `|eps|`):
 Method comparison (`parametric_inverse` vs `latent_ridge`):
 
 ![Reconstruction method comparison](reports/reconstruction_method_comparison.png)
+
+Sanity: shape confidence vs reconstruction IoU:
+
+![Reconstruction confidence vs IoU](reports/reconstruction_confidence_vs_iou.png)
+
+Pattern audit: permutation null distribution:
+
+![Pattern audit null histogram](reports/pattern_audit_null_hist.png)
 
 后端支持：
 - `synthetic`（默认）：合成非定常尾迹信号，保证无 CFD 环境也能完整跑通。
@@ -126,6 +147,12 @@ make sota
 make reconstruct
 ```
 
+### Pattern-Matching Audit
+
+```bash
+make audit CONFIG=configs/exp_360_airfoil.yaml AUDIT_N_PERM=120
+```
+
 ### Build preview GIF
 
 ```bash
@@ -168,6 +195,7 @@ python -m sim.generate_dataset --config configs/exp_360_airfoil.yaml
 python -m extract.build_features --config configs/exp_360_airfoil.yaml
 python -m ml.train_sota --config configs/exp_360_airfoil.yaml
 python -m ml.reconstruct --config configs/exp_360_airfoil.yaml
+python -m ml.audit_shortcut --config configs/exp_360_airfoil.yaml --n_perm 120
 python scripts/make_publication_figure.py --config configs/exp_360_airfoil.yaml --output reports/figure_main_airfoil_360.png
 ```
 
@@ -175,6 +203,28 @@ python scripts/make_publication_figure.py --config configs/exp_360_airfoil.yaml 
 - `reports/summary_exp_360_airfoil.md`
 - `reports/sota_summary_exp_360_airfoil.md`
 - `reports/reconstruction_summary_exp_360_airfoil.md`
+- `reports/reconstruction_sanity_exp_360_airfoil.md`
+- `reports/reconstruction_case_metrics_exp_360_airfoil.csv`
+- `reports/pattern_audit_exp_360_airfoil.md`
+- `reports/pattern_audit_null_exp_360_airfoil.csv`
+
+### 大差异形状实验（450 cases）
+
+```bash
+python -m sim.generate_dataset --config configs/exp_450_biggap.yaml
+python -m extract.build_features --config configs/exp_450_biggap.yaml
+python -m ml.train_sota --config configs/exp_450_biggap.yaml
+python -m ml.reconstruct --config configs/exp_450_biggap.yaml
+python -m ml.audit_shortcut --config configs/exp_450_biggap.yaml --n_perm 60
+python scripts/make_publication_figure.py --config configs/exp_450_biggap.yaml --output reports/figure_main_biggap_450.png
+```
+
+该实验的归档报告：
+- `reports/summary_exp_450_biggap.md`
+- `reports/sota_summary_exp_450_biggap.md`
+- `reports/reconstruction_summary_exp_450_biggap.md`
+- `reports/pattern_audit_exp_450_biggap.md`
+- `reports/figure_main_biggap_450.png`
 
 ## 3. Required Outputs
 
@@ -206,7 +256,15 @@ python scripts/make_publication_figure.py --config configs/exp_360_airfoil.yaml 
   - `reports/reconstruction_method_leaderboard.csv`
   - `reports/reconstruction_repeats.csv`
   - `reports/reconstruction_summary.md`
+  - `reports/reconstruction_case_metrics.csv`
+  - `reports/reconstruction_sanity.md`
+  - `reports/reconstruction_confidence_vs_iou.png`
+  - `reports/pattern_audit.md`
+  - `reports/pattern_audit_null.csv`
+  - `reports/pattern_audit_nn_distance.csv`
+  - `reports/pattern_audit_null_hist.png`
   - `reports/figure_main_airfoil_360.png`
+  - `reports/figure_main_biggap_450.png`
   - `reports/figure_main_airfoil_360.pdf`
   - `reports/figure_main_airfoil_360.json`
 

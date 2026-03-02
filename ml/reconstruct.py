@@ -89,20 +89,55 @@ def _iou_and_dice(y_true: np.ndarray, y_pred: np.ndarray, threshold: float) -> t
     return iou, dice
 
 
+def _geometry_classes(flat_img: np.ndarray) -> np.ndarray:
+    cls = np.zeros(flat_img.shape, dtype=np.int8)
+    cls[(flat_img >= 0.2) & (flat_img < 0.8)] = 1
+    cls[flat_img >= 0.8] = 2
+    return cls
+
+
+def _multiclass_iou_from_class_maps(cls_true: np.ndarray, cls_pred: np.ndarray) -> tuple[float, tuple[float, float, float]]:
+    ious: list[float] = []
+    for cls in (0, 1, 2):
+        inter = np.logical_and(cls_true == cls, cls_pred == cls).sum()
+        union = np.logical_or(cls_true == cls, cls_pred == cls).sum()
+        ious.append(float(inter / (union + 1e-9)))
+    return float(np.mean(ious)), (ious[0], ious[1], ious[2])
+
+
 def _evaluate_prediction(y_true: np.ndarray, y_pred: np.ndarray, threshold: float) -> dict[str, float]:
     mse = float(mean_squared_error(y_true, y_pred))
     iou_list = []
     dice_list = []
+    miou3_list = []
+    miou3_fluid = []
+    miou3_wall = []
+    miou3_obstacle = []
     for i in range(y_true.shape[0]):
         iou, dice = _iou_and_dice(y_true[i], y_pred[i], threshold=threshold)
         iou_list.append(iou)
         dice_list.append(dice)
+        cls_true = _geometry_classes(y_true[i])
+        cls_pred = _geometry_classes(y_pred[i])
+        miou3, (iou_fluid, iou_wall, iou_obstacle) = _multiclass_iou_from_class_maps(cls_true, cls_pred)
+        miou3_list.append(miou3)
+        miou3_fluid.append(iou_fluid)
+        miou3_wall.append(iou_wall)
+        miou3_obstacle.append(iou_obstacle)
     return {
         "mse": mse,
         "iou": float(np.mean(iou_list)),
         "dice": float(np.mean(dice_list)),
+        "miou3": float(np.mean(miou3_list)),
+        "miou3_fluid": float(np.mean(miou3_fluid)),
+        "miou3_wall": float(np.mean(miou3_wall)),
+        "miou3_obstacle": float(np.mean(miou3_obstacle)),
         "iou_values": np.asarray(iou_list, dtype=float),
         "dice_values": np.asarray(dice_list, dtype=float),
+        "miou3_values": np.asarray(miou3_list, dtype=float),
+        "miou3_fluid_values": np.asarray(miou3_fluid, dtype=float),
+        "miou3_wall_values": np.asarray(miou3_wall, dtype=float),
+        "miou3_obstacle_values": np.asarray(miou3_obstacle, dtype=float),
     }
 
 
@@ -216,11 +251,29 @@ def _predict_parametric_inverse(
     image_height: int,
     image_width: int,
 ) -> tuple[np.ndarray, dict]:
-    shape_pred = model_pack["classifier"].predict(x_test)
-    params_pred = model_pack["param_regressor"].predict(x_test)
+    classifier = model_pack["classifier"]
+    regressor = model_pack["param_regressor"]
+
+    shape_pred = classifier.predict(x_test)
+    params_pred = regressor.predict(x_test)
     if params_pred.ndim == 1:
         params_pred = params_pred.reshape(-1, 2)
     dy_pred, eps_pred = _clip_params(params_pred[:, 0], params_pred[:, 1], cfg)
+
+    shape_confidence = None
+    if hasattr(classifier, "predict_proba"):
+        shape_confidence = np.max(classifier.predict_proba(x_test), axis=1)
+
+    dy_std = None
+    eps_std = None
+    estimators = getattr(regressor, "estimators_", None)
+    if estimators:
+        per_tree = np.stack([est.predict(x_test) for est in estimators], axis=0)
+        if per_tree.ndim == 2:
+            per_tree = per_tree[:, :, None]
+        if per_tree.shape[2] >= 2:
+            dy_std = per_tree[:, :, 0].std(axis=0)
+            eps_std = per_tree[:, :, 1].std(axis=0)
 
     pred_img = _render_from_predicted_params(
         shape_pred=shape_pred,
@@ -234,6 +287,9 @@ def _predict_parametric_inverse(
         "shape_pred": np.asarray(shape_pred, dtype=str),
         "dy_pred": np.asarray(dy_pred, dtype=float),
         "eps_pred": np.asarray(eps_pred, dtype=float),
+        "shape_confidence": np.asarray(shape_confidence, dtype=float) if shape_confidence is not None else None,
+        "dy_std": np.asarray(dy_std, dtype=float) if dy_std is not None else None,
+        "eps_std": np.asarray(eps_std, dtype=float) if eps_std is not None else None,
     }
 
 
@@ -342,6 +398,142 @@ def _plot_iou_vs_eps(eps: np.ndarray, iou: np.ndarray, output_path: Path) -> Non
     plt.close(fig)
 
 
+def _plot_confidence_vs_iou(shape_confidence: np.ndarray, iou_values: np.ndarray, output_path: Path) -> None:
+    if shape_confidence.size == 0:
+        return
+    fig, ax = plt.subplots(figsize=(7.2, 4.5))
+    ax.scatter(shape_confidence, iou_values, alpha=0.85)
+    if shape_confidence.size > 1:
+        order = np.argsort(shape_confidence)
+        xs = shape_confidence[order]
+        ys = iou_values[order]
+        ax.plot(xs, ys, alpha=0.45)
+    ax.set_xlabel("Shape confidence")
+    ax.set_ylabel("Obstacle IoU")
+    ax.set_xlim(0.0, 1.02)
+    ax.set_ylim(0.0, 1.05)
+    ax.set_title("Reconstruction Quality vs Shape Confidence")
+    ax.grid(alpha=0.25)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=180)
+    plt.close(fig)
+
+
+def _build_case_metrics_df(
+    features_df: pd.DataFrame,
+    idx_test: np.ndarray,
+    y_shape_test: np.ndarray,
+    y_params_test: np.ndarray,
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    metrics: dict[str, np.ndarray],
+    aux: dict,
+) -> pd.DataFrame:
+    case_df = pd.DataFrame(
+        {
+            "case_id": features_df.iloc[idx_test]["case_id"].astype(str).to_numpy(),
+            "shape_true": y_shape_test.astype(str),
+            "Re": features_df.iloc[idx_test]["Re"].astype(int).to_numpy(),
+            "dy_true": y_params_test[:, 0].astype(float),
+            "eps_true": y_params_test[:, 1].astype(float),
+            "iou_obstacle": metrics["iou_values"].astype(float),
+            "dice_obstacle": metrics["dice_values"].astype(float),
+            "miou3": metrics["miou3_values"].astype(float),
+            "miou3_fluid": metrics["miou3_fluid_values"].astype(float),
+            "miou3_wall": metrics["miou3_wall_values"].astype(float),
+            "miou3_obstacle": metrics["miou3_obstacle_values"].astype(float),
+            "mse_case": np.mean((y_true - y_pred) ** 2, axis=1).astype(float),
+        }
+    )
+
+    if aux.get("shape_pred") is not None:
+        case_df["shape_pred"] = aux["shape_pred"].astype(str)
+        case_df["shape_correct"] = (case_df["shape_true"] == case_df["shape_pred"]).astype(int)
+    if aux.get("shape_confidence") is not None:
+        case_df["shape_confidence"] = aux["shape_confidence"].astype(float)
+    if aux.get("dy_pred") is not None:
+        case_df["dy_pred"] = aux["dy_pred"].astype(float)
+        case_df["dy_abs_err"] = np.abs(case_df["dy_true"] - case_df["dy_pred"])
+    if aux.get("eps_pred") is not None:
+        case_df["eps_pred"] = aux["eps_pred"].astype(float)
+        case_df["eps_abs_err"] = np.abs(case_df["eps_true"] - case_df["eps_pred"])
+        case_df["eps_sign_correct"] = ((case_df["eps_true"] >= 0) == (case_df["eps_pred"] >= 0)).astype(int)
+    if aux.get("dy_std") is not None:
+        case_df["dy_std"] = aux["dy_std"].astype(float)
+    if aux.get("eps_std") is not None:
+        case_df["eps_std"] = aux["eps_std"].astype(float)
+
+    return case_df.sort_values(["iou_obstacle", "mse_case"], ascending=[True, False]).reset_index(drop=True)
+
+
+def _random_pair_metrics(y_true: np.ndarray, y_pred: np.ndarray, threshold: float, seed: int = 123) -> dict[str, float]:
+    rng = np.random.default_rng(seed)
+    perm = rng.permutation(y_true.shape[0])
+    return _evaluate_prediction(y_true=y_true[perm], y_pred=y_pred, threshold=threshold)
+
+
+def _write_sanity_report(
+    output_path: Path,
+    aligned_metrics: dict[str, float],
+    random_metrics: dict[str, float],
+    case_metrics_df: pd.DataFrame,
+    confidence_threshold: float | None = None,
+) -> None:
+    lines: list[str] = []
+    lines.append("# Reconstruction Sanity Report")
+    lines.append("")
+    lines.append("## Aligned vs Random-Pair Control")
+    lines.append(
+        f"- Obstacle IoU: aligned={aligned_metrics['iou']:.4f}, random_pair={random_metrics['iou']:.4f}, "
+        f"delta={aligned_metrics['iou'] - random_metrics['iou']:.4f}"
+    )
+    lines.append(
+        f"- Obstacle Dice: aligned={aligned_metrics['dice']:.4f}, random_pair={random_metrics['dice']:.4f}, "
+        f"delta={aligned_metrics['dice'] - random_metrics['dice']:.4f}"
+    )
+    lines.append(
+        f"- Geometry mIoU(3-class): aligned={aligned_metrics['miou3']:.4f}, random_pair={random_metrics['miou3']:.4f}, "
+        f"delta={aligned_metrics['miou3'] - random_metrics['miou3']:.4f}"
+    )
+    lines.append("")
+
+    lines.append("## Low-Quality Tail")
+    n = int(case_metrics_df.shape[0])
+    low05 = int((case_metrics_df["iou_obstacle"] < 0.5).sum())
+    low07 = int((case_metrics_df["iou_obstacle"] < 0.7).sum())
+    lines.append(f"- Cases with obstacle IoU < 0.50: {low05}/{n} ({(low05 / max(n, 1)) * 100.0:.2f}%)")
+    lines.append(f"- Cases with obstacle IoU < 0.70: {low07}/{n} ({(low07 / max(n, 1)) * 100.0:.2f}%)")
+
+    if "shape_correct" in case_metrics_df.columns:
+        lines.append(f"- Shape accuracy on this holdout: {case_metrics_df['shape_correct'].mean():.4f}")
+    if "shape_confidence" in case_metrics_df.columns:
+        corr = np.corrcoef(case_metrics_df["shape_confidence"].to_numpy(), case_metrics_df["iou_obstacle"].to_numpy())[0, 1]
+        lines.append(f"- Corr(shape_confidence, obstacle_iou): {float(corr):.4f}")
+        if confidence_threshold is not None:
+            flagged = case_metrics_df["shape_confidence"] < float(confidence_threshold)
+            n_flagged = int(flagged.sum())
+            bad = case_metrics_df["iou_obstacle"] < 0.7
+            bad_in_flagged = int((flagged & bad).sum())
+            lines.append(
+                f"- Low-confidence flag (<{confidence_threshold:.2f}): {n_flagged}/{n} flagged; "
+                f"{bad_in_flagged}/{max(n_flagged,1)} flagged cases have IoU<0.7"
+            )
+    lines.append("")
+
+    lines.append("## Worst Cases (Top 10 by lowest obstacle IoU)")
+    cols = ["case_id", "shape_true", "shape_pred", "Re", "iou_obstacle", "miou3"]
+    avail_cols = [c for c in cols if c in case_metrics_df.columns]
+    for _, row in case_metrics_df.head(10)[avail_cols].iterrows():
+        lines.append(
+            "- "
+            + ", ".join(
+                [f"{c}={row[c]:.4f}" if isinstance(row[c], (float, np.floating)) else f"{c}={row[c]}" for c in avail_cols]
+            )
+        )
+
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+
+
 def _plot_method_comparison(method_summary_df: pd.DataFrame, output_path: Path) -> None:
     if method_summary_df.empty:
         return
@@ -385,13 +577,15 @@ def _summarize_by_method(repeat_df: pd.DataFrame) -> pd.DataFrame:
             iou_std=("iou", "std"),
             dice_mean=("dice", "mean"),
             dice_std=("dice", "std"),
+            miou3_mean=("miou3", "mean"),
+            miou3_std=("miou3", "std"),
             shape_acc_mean=("shape_acc", "mean"),
             dy_mae_mean=("dy_mae", "mean"),
             eps_mae_mean=("eps_mae", "mean"),
         )
         .fillna(0.0)
     )
-    summary = summary.sort_values(["iou_mean", "dice_mean", "mse_mean"], ascending=[False, False, True]).reset_index(drop=True)
+    summary = summary.sort_values(["miou3_mean", "iou_mean", "dice_mean", "mse_mean"], ascending=[False, False, False, True]).reset_index(drop=True)
     summary["method_rank"] = np.arange(1, summary.shape[0] + 1)
     return summary
 
@@ -420,6 +614,7 @@ def _write_summary(
             + (
                 f"{row['method']}: IoU={row['iou_mean']:.4f}±{row['iou_std']:.4f}, "
                 f"Dice={row['dice_mean']:.4f}±{row['dice_std']:.4f}, "
+                f"mIoU3={row['miou3_mean']:.4f}±{row['miou3_std']:.4f}, "
                 f"MSE={row['mse_mean']:.6f}±{row['mse_std']:.6f}, "
                 f"shape_acc={row['shape_acc_mean']:.4f}, "
                 f"dy_MAE={row['dy_mae_mean']:.5f}, eps_MAE={row['eps_mae_mean']:.5f}"
@@ -430,7 +625,8 @@ def _write_summary(
     for row in re_rows:
         lines.append(
             f"- Re={row['Re_test']} (n={row['n_test']}): MSE={row['mse']:.6f}, IoU={row['iou']:.4f}, "
-            f"Dice={row['dice']:.4f}, shape_acc={row['shape_acc']:.4f}, dy_MAE={row['dy_mae']:.5f}, eps_MAE={row['eps_mae']:.5f}"
+            f"Dice={row['dice']:.4f}, mIoU3={row['miou3']:.4f}, shape_acc={row['shape_acc']:.4f}, "
+            f"dy_MAE={row['dy_mae']:.5f}, eps_MAE={row['eps_mae']:.5f}"
         )
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -519,6 +715,7 @@ def main() -> None:
                     "mse": float(metrics["mse"]),
                     "iou": float(metrics["iou"]),
                     "dice": float(metrics["dice"]),
+                    "miou3": float(metrics["miou3"]),
                     "shape_acc": shape_acc,
                     "dy_mae": dy_mae,
                     "eps_mae": eps_mae,
@@ -534,7 +731,9 @@ def main() -> None:
     method_summary_df.to_csv(reports_dir / "reconstruction_method_leaderboard.csv", index=False)
     _plot_method_comparison(method_summary_df, reports_dir / "reconstruction_method_comparison.png")
 
-    best_method = str(method_summary_df.sort_values(["iou_mean", "dice_mean", "mse_mean"], ascending=[False, False, True]).iloc[0]["method"])
+    best_method = str(
+        method_summary_df.sort_values(["miou3_mean", "iou_mean", "dice_mean", "mse_mean"], ascending=[False, False, False, True]).iloc[0]["method"]
+    )
     logger.info("Selected best reconstruction method: %s", best_method)
 
     base_seed = int(cfg["ml"].get("random_state", 42))
@@ -588,6 +787,35 @@ def main() -> None:
         output_path=reports_dir / "reconstruction_iou_vs_eps.png",
     )
 
+    case_metrics_df = _build_case_metrics_df(
+        features_df=features_df,
+        idx_test=np.asarray(idx_test),
+        y_shape_test=np.asarray(y_shape_test),
+        y_params_test=np.asarray(y_params_test),
+        y_true=np.asarray(y_test),
+        y_pred=np.asarray(y_pred),
+        metrics=base_metrics,
+        aux=aux,
+    )
+    case_metrics_path = reports_dir / "reconstruction_case_metrics.csv"
+    case_metrics_df.to_csv(case_metrics_path, index=False)
+
+    random_metrics = _random_pair_metrics(y_true=y_test, y_pred=y_pred, threshold=obstacle_threshold, seed=123)
+    _write_sanity_report(
+        output_path=reports_dir / "reconstruction_sanity.md",
+        aligned_metrics=base_metrics,
+        random_metrics=random_metrics,
+        case_metrics_df=case_metrics_df,
+        confidence_threshold=float(rec_cfg.get("confidence_threshold", 0.45)),
+    )
+    shape_conf = aux.get("shape_confidence")
+    if shape_conf is not None:
+        _plot_confidence_vs_iou(
+            shape_confidence=np.asarray(shape_conf, dtype=float),
+            iou_values=np.asarray(base_metrics["iou_values"], dtype=float),
+            output_path=reports_dir / "reconstruction_confidence_vs_iou.png",
+        )
+
     re_rows = []
     for re_test in sorted(features_df["Re"].unique()):
         train_mask = features_df["Re"].to_numpy() != re_test
@@ -638,6 +866,7 @@ def main() -> None:
                 "mse": float(m_re["mse"]),
                 "iou": float(m_re["iou"]),
                 "dice": float(m_re["dice"]),
+                "miou3": float(m_re["miou3"]),
                 "shape_acc": shape_acc,
                 "dy_mae": dy_mae,
                 "eps_mae": eps_mae,
@@ -669,6 +898,10 @@ def main() -> None:
             "mse": float(base_metrics["mse"]),
             "iou": float(base_metrics["iou"]),
             "dice": float(base_metrics["dice"]),
+            "miou3": float(base_metrics["miou3"]),
+            "random_pair_iou": float(random_metrics["iou"]),
+            "random_pair_dice": float(random_metrics["dice"]),
+            "random_pair_miou3": float(random_metrics["miou3"]),
             "shape_acc": float(np.mean(aux["shape_pred"] == y_shape_test)) if "shape_pred" in aux else None,
             "dy_mae": float(np.mean(np.abs(aux["dy_pred"] - y_params_test[:, 0]))) if "dy_pred" in aux else None,
             "eps_mae": float(np.mean(np.abs(aux["eps_pred"] - y_params_test[:, 1]))) if "eps_pred" in aux else None,
@@ -689,11 +922,12 @@ def main() -> None:
         pickle.dump(model_blob, handle)
 
     logger.info(
-        "Reconstruction done. method=%s mse=%.6f iou=%.4f dice=%.4f model=%s",
+        "Reconstruction done. method=%s mse=%.6f iou=%.4f dice=%.4f miou3=%.4f model=%s",
         best_method,
         base_metrics["mse"],
         base_metrics["iou"],
         base_metrics["dice"],
+        base_metrics["miou3"],
         model_path,
     )
 

@@ -40,6 +40,10 @@ def _airfoil_mask(px: np.ndarray, py: np.ndarray, cx: float, cy: float, chord: f
     return inside_x & (np.abs(py - cy) <= half_thickness)
 
 
+def _diamond_mask(px: np.ndarray, py: np.ndarray, cx: float, cy: float, half_dx: float, half_dy: float) -> np.ndarray:
+    return (np.abs(px - cx) / (half_dx + 1e-12) + np.abs(py - cy) / (half_dy + 1e-12)) <= 1.0
+
+
 def obstacle_mask(px: np.ndarray, py: np.ndarray, shape: str, cx: float, cy: float, d: float) -> np.ndarray:
     if shape == "circle":
         r = 0.5 * d
@@ -50,6 +54,10 @@ def obstacle_mask(px: np.ndarray, py: np.ndarray, shape: str, cx: float, cy: flo
         return _triangle_mask(px, py, cx=cx, cy=cy, side=d)
     if shape == "airfoil":
         return _airfoil_mask(px, py, cx=cx, cy=cy, chord=d, thickness_ratio=0.14)
+    if shape == "diamond":
+        return _diamond_mask(px, py, cx=cx, cy=cy, half_dx=0.56 * d, half_dy=0.38 * d)
+    if shape == "bar":
+        return (np.abs(px - cx) <= 0.75 * d) & (np.abs(py - cy) <= 0.18 * d)
     raise ValueError(f"Unsupported shape: {shape}")
 
 

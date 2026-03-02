@@ -5,7 +5,7 @@
   "n_cases": 360,
   "holdout_n": 72,
   "seed": 42,
-  "commit": "609d16f",
+  "commit": "7e10824",
   "classification": {
     "accuracy": 0.9722222222222222,
     "macro_f1": 0.9721362229102167

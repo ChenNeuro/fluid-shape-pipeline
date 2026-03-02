@@ -80,6 +80,19 @@ class SyntheticSimulator:
                 + 0.12 * np.sin(2.0 * np.pi * y_norm + 0.5)
             )
             return np.clip(mode, 0.15, None)
+        if shape == "diamond":
+            mode = (
+                0.52
+                + 0.28 * np.cos(2.0 * np.pi * (y_norm - 0.5))
+                + 0.22 * np.sin(4.0 * np.pi * y_norm + 0.4)
+            )
+            return np.clip(mode, 0.12, None)
+        if shape == "bar":
+            # Flat-plate-like wake: strong centerline shedding + high gradients.
+            center = np.exp(-((y_norm - 0.5) ** 2) / (2.0 * 0.10**2))
+            shoulders = np.exp(-((y_norm - 0.32) ** 2) / (2.0 * 0.07**2)) + np.exp(-((y_norm - 0.68) ** 2) / (2.0 * 0.07**2))
+            mode = 0.45 + 0.55 * center + 0.25 * shoulders
+            return np.clip(mode, 0.10, None)
         raise ValueError(f"Unsupported shape: {shape}")
 
     def run_case(self, case_spec, out_dir: Path) -> Path:
