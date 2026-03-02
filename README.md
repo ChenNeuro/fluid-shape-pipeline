@@ -32,6 +32,14 @@ Reconstruction quality vs outlet perturbation (`IoU` vs `|eps|`):
 
 ![Reconstruction IoU vs eps](reports/reconstruction_iou_vs_eps.png)
 
+Method comparison (`parametric_inverse` vs `latent_ridge`):
+
+![Reconstruction method comparison](reports/reconstruction_method_comparison.png)
+
+当前 `configs/exp_180.yaml` 的重建结果（seed=42 holdout）：
+- `parametric_inverse`: `IoU=0.9671`, `Dice=0.9826`, `MSE=2.55e-4`
+- `latent_ridge`（旧方法）: repeated holdout `IoU≈0.7302`, `Dice≈0.8399`
+
 后端支持：
 - `synthetic`（默认）：合成非定常尾迹信号，保证无 CFD 环境也能完整跑通。
 - `openfoam`：OpenFOAM 自动化适配层（模板 + 命令封装 + probes 解析）。
@@ -136,6 +144,8 @@ make reconstruct CONFIG=configs/exp_180.yaml
   - `reports/sota_summary.md`
   - `reports/reconstruction_examples.png`
   - `reports/reconstruction_iou_vs_eps.png`
+  - `reports/reconstruction_method_comparison.png`
+  - `reports/reconstruction_method_leaderboard.csv`
   - `reports/reconstruction_repeats.csv`
   - `reports/reconstruction_summary.md`
 

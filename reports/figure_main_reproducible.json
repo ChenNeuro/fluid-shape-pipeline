@@ -5,19 +5,20 @@
   "n_cases": 180,
   "holdout_n": 36,
   "seed": 42,
-  "commit": "e310cdf",
+  "commit": "ae8c6e1",
   "classification": {
     "accuracy": 1.0,
     "macro_f1": 1.0
   },
   "reconstruction": {
-    "mse": 0.0005371757554629834,
-    "iou_mean": 0.7355501040378176,
-    "dice_mean": 0.8414130680710102
+    "method": "parametric_inverse",
+    "mse": 0.0002545166015625,
+    "iou_mean": 0.967065538719023,
+    "dice_mean": 0.9826103196810264
   },
   "example_case_ids": [
-    "triangle_Re200_p13",
-    "circle_Re300_p06",
-    "square_Re200_p15"
+    "triangle_Re200_p14",
+    "triangle_Re100_p18",
+    "square_Re200_p14"
   ]
 }
