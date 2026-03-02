@@ -1,0 +1,2 @@
+2026-03-02 16:27:37,115 | INFO | train | Training done. accuracy=1.0000 macro_f1=1.0000 model=/Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/models/baseline.pkl reports=/Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/reports
+2026-03-02 16:28:57,908 | INFO | train | Training done. accuracy=1.0000 macro_f1=1.0000 model=/Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/models/baseline.pkl reports=/Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/reports
