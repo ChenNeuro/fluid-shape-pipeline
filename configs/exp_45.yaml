@@ -70,6 +70,7 @@ features:
 ml:
   test_size: 0.2
   random_state: 42
+  repeat_seeds: [40, 41, 42, 43, 44]
   n_estimators: 400
   cv_folds: 5
   robustness_bins: 6

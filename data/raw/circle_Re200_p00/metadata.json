@@ -3,15 +3,15 @@
   "backend": "synthetic",
   "shape": "circle",
   "Re": 200,
-  "dy": -0.019405583888051133,
-  "eps": 0.016074905746663627,
+  "dy": -0.038811167776102266,
+  "eps": 0.040187264366659065,
   "seed": 918119432,
   "geometry": {
     "H": 1.0,
     "d": 0.2,
     "x0": 3.0,
     "y0_nominal": 0.5,
-    "y0_actual": 0.48059441611194886,
+    "y0_actual": 0.4611888322238977,
     "L_in": 5.0,
     "L_out": 5.0,
     "L_total": 10.0
@@ -63,7 +63,11 @@
     "t_start": 0.0,
     "t_end": 19.990000000000002,
     "transient_steps": 800,
-    "f0_est": 1.002078168047861
+    "f0_est": 1.0286575846945627
+  },
+  "synthetic_profile": {
+    "challenge_enabled": true,
+    "noise_std": 0.05600000000000001
   },
   "files": {
     "probes_csv": "probes.csv"
