@@ -35,6 +35,90 @@ def _prepare_xy(features_df: pd.DataFrame):
     return x, y, feature_cols
 
 
+def _build_model(model_cfg: dict, seed: int) -> RandomForestClassifier:
+    return RandomForestClassifier(
+        n_estimators=int(model_cfg.get("n_estimators", 300)),
+        random_state=int(seed),
+        n_jobs=-1,
+        class_weight="balanced_subsample",
+    )
+
+
+def _compute_stratified_test_n(n_total: int, n_strata: int, requested_ratio: float) -> int:
+    requested_test_n = max(1, int(round(requested_ratio * n_total)))
+    min_test_n = n_strata
+    max_test_n = n_total - n_strata
+    if max_test_n < 1:
+        raise RuntimeError("Insufficient samples for stratification by (shape, Re)")
+    return min(max(requested_test_n, min_test_n), max_test_n)
+
+
+def _repeat_holdout_metrics(
+    x: np.ndarray,
+    y: np.ndarray,
+    strata: np.ndarray,
+    test_n: int,
+    model_cfg: dict,
+    seeds: list[int],
+) -> tuple[list[dict[str, float]], dict[str, float]]:
+    rows: list[dict[str, float]] = []
+    for seed in seeds:
+        x_train, x_test, y_train, y_test = train_test_split(
+            x,
+            y,
+            test_size=test_n,
+            random_state=seed,
+            stratify=strata,
+        )
+
+        model = _build_model(model_cfg, seed=seed)
+        model.fit(x_train, y_train)
+        pred = model.predict(x_test)
+
+        rows.append(
+            {
+                "seed": int(seed),
+                "train_size": int(x_train.shape[0]),
+                "test_size": int(x_test.shape[0]),
+                "accuracy": float(accuracy_score(y_test, pred)),
+                "macro_f1": float(f1_score(y_test, pred, average="macro")),
+            }
+        )
+
+    acc_values = np.array([r["accuracy"] for r in rows], dtype=float)
+    f1_values = np.array([r["macro_f1"] for r in rows], dtype=float)
+    summary = {
+        "n_repeats": int(len(rows)),
+        "accuracy_mean": float(np.mean(acc_values)),
+        "accuracy_std": float(np.std(acc_values, ddof=0)),
+        "macro_f1_mean": float(np.mean(f1_values)),
+        "macro_f1_std": float(np.std(f1_values, ddof=0)),
+    }
+    return rows, summary
+
+
+def _plot_repeat_metrics(rows: list[dict[str, float]], output_path: Path) -> None:
+    if not rows:
+        return
+
+    df = pd.DataFrame(rows).sort_values("seed")
+    x_axis = np.arange(df.shape[0], dtype=float)
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.2))
+    ax.plot(x_axis, df["accuracy"], marker="o", label="Accuracy")
+    ax.plot(x_axis, df["macro_f1"], marker="s", label="Macro F1")
+    ax.set_ylim(0.0, 1.05)
+    ax.set_xticks(x_axis, labels=[str(s) for s in df["seed"]])
+    ax.set_xlabel("Random seed")
+    ax.set_ylabel("Metric")
+    ax.set_title("Holdout Stability Across Random Seeds")
+    ax.grid(alpha=0.25)
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=180)
+    plt.close(fig)
+
+
 def _plot_pca(features_df: pd.DataFrame, feature_cols: list[str], output_path: Path) -> None:
     x = features_df[feature_cols].to_numpy(dtype=float)
     y = features_df["shape"].to_numpy()
@@ -228,6 +312,8 @@ def _write_summary(
     features_df: pd.DataFrame,
     split_metrics: dict,
     split_meta: dict,
+    repeat_metrics_summary: dict[str, float],
+    repeat_seeds: list[int],
     re_results: list[dict[str, float]],
     robust_rows: list[dict[str, float]],
     top_importance: list[tuple[str, float]],
@@ -263,6 +349,17 @@ def _write_summary(
     )
     lines.append(f"- Accuracy: {split_metrics['accuracy']:.4f}")
     lines.append(f"- Macro F1: {split_metrics['macro_f1']:.4f}")
+    lines.append("")
+
+    lines.append("## Multi-Seed Holdout Stability")
+    lines.append(f"- Seeds: {repeat_seeds}")
+    lines.append(
+        f"- Accuracy mean±std: {repeat_metrics_summary['accuracy_mean']:.4f} ± {repeat_metrics_summary['accuracy_std']:.4f}"
+    )
+    lines.append(
+        f"- Macro F1 mean±std: {repeat_metrics_summary['macro_f1_mean']:.4f} ± {repeat_metrics_summary['macro_f1_std']:.4f}"
+    )
+    lines.append("- Per-seed table: `reports/holdout_repeats.csv`")
     lines.append("")
 
     lines.append("## Leave-One-Re-Out Generalization")
@@ -331,13 +428,10 @@ def main() -> None:
     n_total = int(features_df.shape[0])
     n_strata = int(strata.nunique())
     requested_ratio = float(ml_cfg.get("test_size", 0.2))
+    repeat_seeds = [int(v) for v in ml_cfg.get("repeat_seeds", [random_state])]
+    repeat_seeds = sorted(set(repeat_seeds))
 
-    requested_test_n = max(1, int(round(requested_ratio * n_total)))
-    min_test_n = n_strata
-    max_test_n = n_total - n_strata
-    if max_test_n < 1:
-        raise RuntimeError("Insufficient samples for stratification by (shape, Re)")
-    test_n = min(max(requested_test_n, min_test_n), max_test_n)
+    test_n = _compute_stratified_test_n(n_total=n_total, n_strata=n_strata, requested_ratio=requested_ratio)
 
     x_train, x_test, y_train, y_test = train_test_split(
         x,
@@ -353,12 +447,7 @@ def main() -> None:
         "applied_test_ratio": float(x_test.shape[0] / n_total),
     }
 
-    model = RandomForestClassifier(
-        n_estimators=int(ml_cfg.get("n_estimators", 300)),
-        random_state=random_state,
-        n_jobs=-1,
-        class_weight="balanced_subsample",
-    )
+    model = _build_model(ml_cfg, seed=random_state)
     model.fit(x_train, y_train)
 
     y_pred = model.predict(x_test)
@@ -366,9 +455,20 @@ def main() -> None:
         "accuracy": float(accuracy_score(y_test, y_pred)),
         "macro_f1": float(f1_score(y_test, y_pred, average="macro")),
     }
+    repeat_rows, repeat_summary = _repeat_holdout_metrics(
+        x=x,
+        y=y,
+        strata=strata.to_numpy(),
+        test_n=test_n,
+        model_cfg=ml_cfg,
+        seeds=repeat_seeds,
+    )
 
     reports_dir = root / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
+    repeat_csv = reports_dir / "holdout_repeats.csv"
+    pd.DataFrame(repeat_rows).to_csv(repeat_csv, index=False)
+    _plot_repeat_metrics(repeat_rows, reports_dir / "holdout_stability.png")
 
     labels = sorted(np.unique(y))
     _plot_confusion(y_test, y_pred, labels, reports_dir / "confusion_matrix.png")
@@ -410,13 +510,17 @@ def main() -> None:
         feature_note = "Top contributors are mixed across frequency, statistics, and cross-probe structure features."
 
     if len(robust_rows) >= 2:
-        first_acc = robust_rows[0]["accuracy"]
-        last_acc = robust_rows[-1]["accuracy"]
-        delta = last_acc - first_acc
-        if delta <= -0.05:
-            robustness_note = "Accuracy drops at larger outlet lens perturbations, indicating sensitivity to geometry mismatch."
-        elif delta >= 0.05:
-            robustness_note = "Accuracy increases slightly in higher perturbation bins for this synthetic dataset."
+        acc_values = np.array([row["accuracy"] for row in robust_rows], dtype=float)
+        first_acc = float(acc_values[0])
+        last_acc = float(acc_values[-1])
+        delta_end = last_acc - first_acc
+        valley_drop = first_acc - float(np.min(acc_values))
+        spread = float(np.max(acc_values) - np.min(acc_values))
+
+        if delta_end <= -0.05 or valley_drop >= 0.10 or spread >= 0.20:
+            robustness_note = "Accuracy shows a noticeable drop for parts of the perturbation range, indicating sensitivity to outlet geometry mismatch."
+        elif delta_end >= 0.05:
+            robustness_note = "Accuracy increases slightly toward higher perturbation bins for this synthetic dataset."
         else:
             robustness_note = "Accuracy remains broadly stable across the tested outlet lens perturbation range."
     else:
@@ -425,17 +529,19 @@ def main() -> None:
     manifest_df = pd.read_csv(root / "data" / "raw" / "manifest.csv")
     _write_summary(
         reports_dir / "summary.md",
-        cfg,
-        features_df,
-        metrics,
-        split_meta,
-        re_results,
-        robust_rows,
-        top_importance,
-        importance_method,
-        robustness_note,
-        feature_note,
-        manifest_df,
+        cfg=cfg,
+        features_df=features_df,
+        split_metrics=metrics,
+        split_meta=split_meta,
+        repeat_metrics_summary=repeat_summary,
+        repeat_seeds=repeat_seeds,
+        re_results=re_results,
+        robust_rows=robust_rows,
+        top_importance=top_importance,
+        importance_method=importance_method,
+        robustness_note=robustness_note,
+        feature_note=feature_note,
+        manifest_df=manifest_df,
     )
 
     models_dir = root / "models"
@@ -454,9 +560,10 @@ def main() -> None:
         )
 
     logger.info(
-        "Training done. accuracy=%.4f macro_f1=%.4f model=%s reports=%s",
+        "Training done. accuracy=%.4f macro_f1=%.4f repeats=%d model=%s reports=%s",
         metrics["accuracy"],
         metrics["macro_f1"],
+        len(repeat_rows),
         model_path,
         reports_dir,
     )

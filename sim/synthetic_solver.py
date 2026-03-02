@@ -17,6 +17,7 @@ class SyntheticSimulator:
         self.sim_cfg = cfg["simulation"]
         self.time_cfg = self.sim_cfg["time"]
         self.synthetic_cfg = self.sim_cfg["synthetic"]
+        self.challenge_cfg = self.synthetic_cfg.get("challenge", {})
 
         self.h = float(self.sim_cfg["H"])
         self.d = float(self.sim_cfg["d_ratio"]) * self.h
@@ -79,6 +80,12 @@ class SyntheticSimulator:
 
         params = self._shape_params(case_spec.shape)
         f0 = self._main_frequency(case_spec)
+
+        challenge_enabled = bool(self.challenge_cfg.get("enabled", False))
+        if challenge_enabled:
+            freq_jitter_std = float(self.challenge_cfg.get("freq_jitter_std", 0.0))
+            f0 *= float(np.clip(1.0 + rng.normal(0.0, freq_jitter_std), 0.7, 1.3))
+
         t_total, dt, n_transient = self._time_axis(f0)
         t_sample = t_total[n_transient:] - t_total[n_transient]
         n_total = t_total.size
@@ -89,6 +96,9 @@ class SyntheticSimulator:
         lens_factor = np.clip(lens_factor, 0.85, 1.15)
 
         amp_base = float(params["amp"]) * np.sqrt(float(case_spec.re) / 200.0)
+        if challenge_enabled:
+            amp_jitter_std = float(self.challenge_cfg.get("amp_jitter_std", 0.0))
+            amp_base *= float(np.clip(1.0 + rng.normal(0.0, amp_jitter_std), 0.6, 1.6))
         spatial_amp = self._shape_spatial_mode(case_spec.shape, y_shifted)
         amplitude = amp_base * spatial_amp * (1.0 + 1.5 * abs(float(case_spec.eps)))
 
@@ -96,6 +106,13 @@ class SyntheticSimulator:
         h3 = float(params.get("h3", 0.10))
         phase_gradient = float(params.get("phase_gradient", 2.0))
         noise_std = float(self.synthetic_cfg["noise_std"])
+        if challenge_enabled:
+            noise_std *= float(self.challenge_cfg.get("noise_multiplier", 1.0))
+
+        common_amp = float(self.challenge_cfg.get("common_mode_amp", 0.0)) if challenge_enabled else 0.0
+        common_freq_ratio = float(self.challenge_cfg.get("common_mode_freq_ratio", 0.85)) if challenge_enabled else 0.85
+        drift_amp = float(self.challenge_cfg.get("drift_amp", 0.0)) if challenge_enabled else 0.0
+        drift_freq_ratio = float(self.challenge_cfg.get("drift_freq_ratio", 0.08)) if challenge_enabled else 0.08
 
         startup = 1.0 - np.exp(-t_total / max(1.0, float(self.time_cfg["transient_time"]) / 2.0))
 
@@ -108,11 +125,28 @@ class SyntheticSimulator:
             harmonic2 = h2 * np.sin(2.0 * np.pi * 2.0 * f0 * t_total + 0.55 * phi)
             harmonic3 = h3 * np.sin(2.0 * np.pi * 3.0 * f0 * t_total + 0.25 * phi)
             broadband = 0.08 * np.sin(2.0 * np.pi * (f0 * 0.35) * t_total + 1.2 * phi)
+            common_mode = common_amp * np.sin(2.0 * np.pi * (common_freq_ratio * f0) * t_total + 0.1 * phi)
+            drift = drift_amp * np.sin(2.0 * np.pi * (drift_freq_ratio * f0) * t_total + 0.3 * phi)
 
-            signal = (fundamental + harmonic2 + harmonic3 + broadband) * startup
+            signal = (fundamental + harmonic2 + harmonic3 + broadband + common_mode + drift) * startup
             noise = rng.normal(0.0, noise_std * (1.0 + 3.0 * abs(float(case_spec.eps))), size=n_total)
 
             u_total[:, idx] = self.u_mean * base_u[idx] * lens_factor[idx] + amplitude[idx] * signal + noise
+
+        if challenge_enabled:
+            probe_mix = float(self.challenge_cfg.get("probe_mix", 0.0))
+            if probe_mix > 0.0:
+                u_total = (
+                    (1.0 - probe_mix) * u_total
+                    + 0.5 * probe_mix * np.roll(u_total, shift=1, axis=1)
+                    + 0.5 * probe_mix * np.roll(u_total, shift=-1, axis=1)
+                )
+
+            dropout_prob = float(self.challenge_cfg.get("dropout_prob", 0.0))
+            dropout_std = float(self.challenge_cfg.get("dropout_std", 0.0))
+            if dropout_prob > 0.0 and dropout_std > 0.0:
+                mask = rng.random(u_total.shape) < dropout_prob
+                u_total[mask] += rng.normal(0.0, dropout_std, size=int(np.sum(mask)))
 
         u_sample = u_total[n_transient:, :]
         columns = [f"u_{i:03d}" for i in range(self.n_probes)]
@@ -153,6 +187,10 @@ class SyntheticSimulator:
                 "t_end": float(t_sample[-1]) if t_sample.size else 0.0,
                 "transient_steps": int(n_transient),
                 "f0_est": float(f0),
+            },
+            "synthetic_profile": {
+                "challenge_enabled": challenge_enabled,
+                "noise_std": float(noise_std),
             },
             "files": {
                 "probes_csv": PROBES_FILENAME,

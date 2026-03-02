@@ -13,17 +13,17 @@ simulation:
   U_mean: 1.0
   re_values: [100, 200, 300]
   shapes: [circle, square, triangle]
-  perturbations_per_combo: 3
+  perturbations_per_combo: 5
   probes_n: 32
   workers: 0
   max_retries: 2
 
   perturb:
     enable_dy: true
-    dy_min: -0.02
-    dy_max: 0.02
+    dy_min: -0.04
+    dy_max: 0.04
     enable_eps: true
-    eps_max: 0.02
+    eps_max: 0.05
 
   time:
     cfl_target: 0.5
@@ -34,26 +34,38 @@ simulation:
     min_samples: 2000
 
   synthetic:
-    noise_std: 0.02
+    noise_std: 0.035
     shape_params:
       circle:
         st: 0.20
-        amp: 0.18
-        h2: 0.28
-        h3: 0.08
+        amp: 0.17
+        h2: 0.26
+        h3: 0.11
         phase_gradient: 2.4
       square:
-        st: 0.14
-        amp: 0.22
-        h2: 0.38
-        h3: 0.22
-        phase_gradient: 3.0
+        st: 0.17
+        amp: 0.19
+        h2: 0.31
+        h3: 0.16
+        phase_gradient: 2.8
       triangle:
-        st: 0.24
-        amp: 0.16
-        h2: 0.22
+        st: 0.22
+        amp: 0.17
+        h2: 0.24
         h3: 0.14
-        phase_gradient: 2.1
+        phase_gradient: 2.2
+    challenge:
+      enabled: true
+      freq_jitter_std: 0.10
+      amp_jitter_std: 0.18
+      noise_multiplier: 1.6
+      common_mode_amp: 0.10
+      common_mode_freq_ratio: 0.85
+      drift_amp: 0.05
+      drift_freq_ratio: 0.07
+      probe_mix: 0.20
+      dropout_prob: 0.008
+      dropout_std: 0.08
 
 openfoam:
   template_dir: sim/templates/openfoam_case

@@ -40,6 +40,13 @@ make dataset CONFIG=configs/exp_45.yaml
 make train CONFIG=configs/exp_45.yaml
 ```
 
+### 挑战性 45-case 压测（更强扰动）
+
+```bash
+make dataset CONFIG=configs/challenging_45.yaml
+make train CONFIG=configs/challenging_45.yaml
+```
+
 ## 3. Required Outputs
 
 - Raw probe series: `data/raw/<case_id>/probes.csv`
@@ -53,6 +60,8 @@ make train CONFIG=configs/exp_45.yaml
   - `reports/spectra_examples.png`
   - `reports/confusion_matrix.png`
   - `reports/robustness_sweep.png`
+  - `reports/holdout_stability.png`
+  - `reports/holdout_repeats.csv`
   - `reports/summary.md`
 
 ## 4. Data Schema
@@ -84,6 +93,7 @@ Per case row:
 
 - Baseline model: `RandomForestClassifier`
 - Holdout split: stratified by `(shape, Re)`
+- Multi-seed stability: repeated holdout across `ml.repeat_seeds`
 - Generalization test: Leave-One-Re-Out
 - Metrics: `accuracy`, `macro F1`, confusion matrix
 - Robustness sweep: `|eps|` bin vs cross-validated accuracy
