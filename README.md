@@ -2,6 +2,10 @@
 
 可复现实验仓库：在 2D 通道流中用出口截面探针速度 `u(t)` 识别上游障碍物形状（`circle/square/triangle`）。
 
+## Visual Preview
+
+![Pipeline overview GIF](reports/pipeline_overview.gif)
+
 后端支持：
 - `synthetic`（默认）：合成非定常尾迹信号，保证无 CFD 环境也能完整跑通。
 - `openfoam`：OpenFOAM 自动化适配层（模板 + 命令封装 + probes 解析）。
@@ -39,6 +43,12 @@ make train
 make sota
 ```
 
+### Build preview GIF
+
+```bash
+make gif
+```
+
 ### 45-case 扩展实验
 
 ```bash
@@ -63,6 +73,7 @@ make train CONFIG=configs/challenging_45.yaml
 - Model: `models/baseline.pkl`
 - SOTA candidate model (best from model search): `models/sota.pkl`
 - Reports:
+  - `reports/pipeline_overview.gif`
   - `reports/separability_pca.png`
   - `reports/spectra_examples.png`
   - `reports/confusion_matrix.png`
