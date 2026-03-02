@@ -21,6 +21,25 @@ def _triangle_mask(px: np.ndarray, py: np.ndarray, cx: float, cy: float, side: f
     return ~(has_neg & has_pos)
 
 
+def _airfoil_mask(px: np.ndarray, py: np.ndarray, cx: float, cy: float, chord: float, thickness_ratio: float = 0.12) -> np.ndarray:
+    """
+    Symmetric NACA-like 4-digit airfoil mask (e.g. NACA 00xx), chord-aligned with +x.
+    """
+    xr = (px - cx) / chord + 0.5
+    inside_x = (xr >= 0.0) & (xr <= 1.0)
+
+    x_clamped = np.clip(xr, 0.0, 1.0)
+    yt_over_c = 5.0 * thickness_ratio * (
+        0.2969 * np.sqrt(x_clamped + 1e-12)
+        - 0.1260 * x_clamped
+        - 0.3516 * x_clamped**2
+        + 0.2843 * x_clamped**3
+        - 0.1015 * x_clamped**4
+    )
+    half_thickness = chord * yt_over_c
+    return inside_x & (np.abs(py - cy) <= half_thickness)
+
+
 def obstacle_mask(px: np.ndarray, py: np.ndarray, shape: str, cx: float, cy: float, d: float) -> np.ndarray:
     if shape == "circle":
         r = 0.5 * d
@@ -29,6 +48,8 @@ def obstacle_mask(px: np.ndarray, py: np.ndarray, shape: str, cx: float, cy: flo
         return (np.abs(px - cx) <= 0.5 * d) & (np.abs(py - cy) <= 0.5 * d)
     if shape == "triangle":
         return _triangle_mask(px, py, cx=cx, cy=cy, side=d)
+    if shape == "airfoil":
+        return _airfoil_mask(px, py, cx=cx, cy=cy, chord=d, thickness_ratio=0.14)
     raise ValueError(f"Unsupported shape: {shape}")
 
 
@@ -87,4 +108,3 @@ def render_case_image(
     )
     image[obs] = 1.0
     return image
-

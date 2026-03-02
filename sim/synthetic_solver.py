@@ -72,6 +72,14 @@ class SyntheticSimulator:
             return 0.6 + 0.4 * np.sin(np.pi * y_norm) ** 2
         if shape == "triangle":
             return 0.55 + 0.45 * np.cos(2.0 * np.pi * y_norm + 0.6)
+        if shape == "airfoil":
+            # Skewed wake mode to mimic lift-induced asymmetry.
+            mode = (
+                0.58
+                + 0.24 * np.cos(np.pi * (y_norm - 0.42))
+                + 0.12 * np.sin(2.0 * np.pi * y_norm + 0.5)
+            )
+            return np.clip(mode, 0.15, None)
         raise ValueError(f"Unsupported shape: {shape}")
 
     def run_case(self, case_spec, out_dir: Path) -> Path:

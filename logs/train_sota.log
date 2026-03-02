@@ -1,3 +1,4 @@
 2026-03-02 18:43:28,110 | INFO | train_sota | SOTA candidate training done. best=hard_vote_ensemble acc=1.0000 macro_f1=1.0000 model=/Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/models/sota.pkl
 2026-03-02 23:20:07,751 | INFO | train_sota | SOTA candidate training done. best=svc_rbf acc=1.0000 macro_f1=1.0000 model=/Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/models/sota.pkl
 2026-03-02 23:41:38,478 | INFO | train_sota | SOTA candidate training done. best=svc_rbf acc=1.0000 macro_f1=1.0000 model=/Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/models/sota.pkl
+2026-03-02 23:55:32,557 | INFO | train_sota | SOTA candidate training done. best=svc_rbf acc=0.9722 macro_f1=0.9721 model=/Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/models/sota.pkl
