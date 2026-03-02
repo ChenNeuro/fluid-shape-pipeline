@@ -1,0 +1,2 @@
+2026-03-02 19:05:16,356 | INFO | reconstruct | Reconstruction done. mse=0.000568 iou=0.7171 dice=0.8293 model=/Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/models/reconstructor.pkl
+2026-03-02 19:06:02,582 | INFO | reconstruct | Reconstruction done. mse=0.000559 iou=0.7302 dice=0.8399 model=/Users/chenyihao/Desktop/大三下/课程/流体力学实验/fluid-shape-pipeline/models/reconstructor.pkl
