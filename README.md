@@ -1,19 +1,14 @@
 # Fluid Camera: CFD + ML End-to-End Pipeline
 
-可复现实验仓库：在 2D 通道流中用出口截面探针速度 `u(t)` 识别上游障碍物形状（`circle/square/triangle`）。
+可复现实验仓库：在 2D 通道流中用出口截面探针速度 `u(t)` 识别上游障碍物形状（支持 `circle/triangle/airfoil/diamond/bar` 等多形状）。
 
 ## TL;DR
 
-- 已完成大实验：`configs/exp_360_airfoil.yaml`，总计 `360 cases`（`circle/square/triangle/airfoil`）
-- 分类：`SVC(RBF)` repeated holdout `acc=0.9861±0.0124`，seed=42 holdout `acc=0.9722`
-- 重建：`parametric_inverse` repeated holdout `IoU=0.9340±0.0099`，seed=42 holdout `IoU=0.9404`
-- 反模式匹配审计（120次置换）：`p=0.008264`，拒绝“纯模板匹配”假设
-- 全流程可复现：`python -m sim.generate_dataset --config configs/exp_360_airfoil.yaml` 后续接 `train_sota/reconstruct/figure`
-
-最新“放大形状差异”实验：`configs/exp_450_biggap.yaml`（`circle/triangle/airfoil/diamond/bar`，450 cases）
-- 分类（repeated holdout）：`0.9978±0.0044`
-- 重建（repeated holdout）：`IoU=0.9472±0.0050`, `mIoU3=0.9774±0.0020`
-- 置换审计（60次）：`p=0.016393`
+- 当前主实验：`configs/exp_450_biggap.yaml`，总计 `450 cases`（`circle/triangle/airfoil/diamond/bar`）
+- 分类（SOTA，repeated holdout）：`0.9978±0.0044`，holdout=`1.0000`
+- 重建（repeated holdout）：`IoU=0.9472±0.0050`，`mIoU3=0.9774±0.0020`
+- 反模式匹配审计（60次置换）：`p=0.016393`
+- 全流程可复现：`python -m sim.generate_dataset --config configs/exp_450_biggap.yaml` 后续接 `train_sota/reconstruct/audit/figure`
 
 ## 当前算法（你问的“基于什么算法”）
 
@@ -27,24 +22,24 @@
 
 ## 效果与可信度（你问的“怎么确保效果”）
 
-数据配置：`configs/exp_360_airfoil.yaml`（360 cases，按 `(shape, Re)` 分层切分，5 个随机种子重复）
+数据配置：`configs/exp_450_biggap.yaml`（450 cases，按 `(shape, Re)` 分层切分，5 个随机种子重复）
 
 ### 分类结果（`reports/sota_summary.md`）
 
 | Metric | Value |
 |---|---|
-| Holdout (seed=42) accuracy | `0.9722` |
-| Holdout (seed=42) macro F1 | `0.9721` |
-| Repeated holdout accuracy | `0.9861 ± 0.0124` |
-| Repeated holdout macro F1 | `0.9861 ± 0.0125` |
-| Leave-One-Re-Out worst acc | `0.8750` (Re=100) |
+| Holdout (seed=42) accuracy | `1.0000` |
+| Holdout (seed=42) macro F1 | `1.0000` |
+| Repeated holdout accuracy | `0.9978 ± 0.0044` |
+| Repeated holdout macro F1 | `0.9978 ± 0.0044` |
+| Leave-One-Re-Out worst acc | `0.9200` (Re=100) |
 
 ### 重建结果（`reports/reconstruction_summary.md`）
 
 | Method | IoU (mean±std) | Dice (mean±std) | MSE (mean±std) |
 |---|---|---|---|
-| `parametric_inverse` | `0.9340 ± 0.0099` | `0.9569 ± 0.0083` | `2.42e-4 ± 4.30e-5` |
-| `latent_ridge` | `0.4402 ± 0.0143` | `0.5541 ± 0.0159` | `7.06e-4 ± 2.10e-5` |
+| `parametric_inverse` | `0.9472 ± 0.0050` | `0.9689 ± 0.0036` | `1.71e-4 ± 1.70e-5` |
+| `latent_ridge` | `0.4200 ± 0.0236` | `0.5439 ± 0.0210` | `6.12e-4 ± 2.40e-5` |
 
 已做的稳健性与泛化检查：
 - 重复 holdout（多种子）而不是单次结果
@@ -53,6 +48,7 @@
 - 同数据同切分下的新旧方法 A/B 对照
 - 重建 sanity 对照（aligned vs random-pair）与低质量尾部统计（见 `reports/reconstruction_sanity.md`）
 - 机器统计反模式匹配审计（置换检验 + 1NN模板检索 + 近重复检测，见 `reports/pattern_audit.md`）
+- 审计主结论（`exp_450_biggap`）：observed IoU=`0.9414` vs null mean=`0.3317`，p=`0.016393`
 
 ## Visual Preview
 
@@ -150,7 +146,7 @@ make reconstruct
 ### Pattern-Matching Audit
 
 ```bash
-make audit CONFIG=configs/exp_360_airfoil.yaml AUDIT_N_PERM=120
+make audit CONFIG=configs/exp_450_biggap.yaml AUDIT_N_PERM=60
 ```
 
 ### Build preview GIF
@@ -162,7 +158,7 @@ make gif
 ### Build publication main figure
 
 ```bash
-make figure CONFIG=configs/exp_180.yaml
+python scripts/make_publication_figure.py --config configs/exp_450_biggap.yaml --output reports/figure_main_biggap_450.png
 ```
 
 ### 45-case 扩展实验
