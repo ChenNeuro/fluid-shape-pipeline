@@ -1,0 +1,12 @@
+2026-04-23 09:36:07,032 | INFO | train_wake | Training wake-field variant full_only_4ch
+2026-04-23 09:36:09,083 | INFO | train_wake | Variant full_only_4ch seed=42 done. acc=0.2667 macro_f1=0.1706 dy_mae=0.02198 eps_mae=0.04147
+2026-04-23 09:36:09,084 | INFO | train_wake | Training wake-field variant full_half_quarter_4ch
+2026-04-23 09:36:09,667 | INFO | train_wake | Variant full_half_quarter_4ch seed=42 done. acc=0.2000 macro_f1=0.0667 dy_mae=0.03802 eps_mae=0.04147
+2026-04-23 09:36:09,667 | INFO | train_wake | Training wake-field variant full_half_quarter_hotspot_4ch
+2026-04-23 09:36:10,646 | INFO | train_wake | Variant full_half_quarter_hotspot_4ch seed=42 done. acc=0.2667 macro_f1=0.1550 dy_mae=0.03802 eps_mae=0.03853
+2026-04-23 09:36:10,646 | INFO | train_wake | Training wake-field variant full_half_quarter_hotspot_speed
+2026-04-23 09:36:11,189 | INFO | train_wake | Variant full_half_quarter_hotspot_speed seed=42 done. acc=0.2000 macro_f1=0.0667 dy_mae=0.02198 eps_mae=0.03853
+2026-04-23 09:36:12,463 | INFO | train_wake | Leave-one-Re-out main variant Re=100 done. acc=0.2000 macro_f1=0.0667
+2026-04-23 09:36:13,058 | INFO | train_wake | Leave-one-Re-out main variant Re=200 done. acc=0.2000 macro_f1=0.0667
+2026-04-23 09:36:13,641 | INFO | train_wake | Leave-one-Re-out main variant Re=300 done. acc=0.2000 macro_f1=0.0667
+2026-04-23 09:36:13,644 | INFO | train_wake | Wake-field training complete. main_variant=full_half_quarter_hotspot_4ch summary=/Users/chenyihao/mycode/流体力学实验/fluid-shape-pipeline/.demo/wake_smoke/reports/wake_field_summary.md

@@ -97,6 +97,8 @@ def build_index_rows(manifest_df: pd.DataFrame, solver_name: str) -> list[dict]:
                         "n_samples": int(sampling.get("n_samples", 0)) if sampling.get("n_samples") is not None else 0,
                         "t_start": sampling.get("t_start"),
                         "t_end": sampling.get("t_end"),
+                        "wake_frames_npz": payload.get("files", {}).get("wake_frames_npz", ""),
+                        "wake_field_npz": payload.get("files", {}).get("wake_field_npz", ""),
                     }
                 )
             except Exception:  # pylint: disable=broad-except

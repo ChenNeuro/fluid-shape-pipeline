@@ -10,6 +10,29 @@
 - 反模式匹配审计（60次置换）：`p=0.016393`
 - 全流程可复现：`python -m sim.generate_dataset --config configs/exp_450_biggap.yaml` 后续接 `train_sota/reconstruct/audit/figure`
 
+## Wake-Field Branch
+
+新增并行分支：`wake_field`。
+
+- 输入不是原始粒子视频，而是由短序列尾流帧估计得到的速度场分布
+- synthetic backend 会在 `data/raw/<case_id>/` 额外写入 `wake_frames.npz`
+- `python -m extract.build_wake_fields --config configs/wake_field_450.yaml` 会生成 `wake_field.npz`
+- `python -m ml.train_wake --config configs/wake_field_450.yaml` 会比较多尺度变体：
+  - `full_only_4ch`
+  - `full_half_quarter_4ch`
+  - `full_half_quarter_hotspot_4ch`
+  - `full_half_quarter_hotspot_speed`
+- `python -m ml.reconstruct_wake --config configs/wake_field_450.yaml` 会输出 canonical inverse reconstruction 报告
+
+推荐命令：
+
+```bash
+make wake-dataset CONFIG=configs/wake_field_450.yaml
+make wake-fields CONFIG=configs/wake_field_450.yaml
+make wake-train CONFIG=configs/wake_field_450.yaml
+make wake-reconstruct CONFIG=configs/wake_field_450.yaml
+```
+
 ## 当前算法（你问的“基于什么算法”）
 
 - 分类分支：

@@ -1,6 +1,7 @@
 project:
   seed: 20260302
   solver: synthetic
+  modality: probe_signal
 
 simulation:
   H: 1.0

@@ -22,7 +22,7 @@ else
   AUDIT_PERM_ARG := --n_perm $(AUDIT_N_PERM)
 endif
 
-.PHONY: dataset train sota reconstruct audit figure gif report clean
+.PHONY: dataset train sota reconstruct audit figure gif report wake-dataset wake-fields wake-train wake-reconstruct wake-pipeline clean
 
 dataset:
 	$(PYTHON) -m sim.generate_dataset --config $(CONFIG) $(SOLVER_ARG) $(WORKERS_ARG)
@@ -48,5 +48,19 @@ gif:
 
 report: train
 
+wake-dataset:
+	$(PYTHON) -m sim.generate_dataset --config $(CONFIG) $(SOLVER_ARG) $(WORKERS_ARG)
+
+wake-fields:
+	$(PYTHON) -m extract.build_wake_fields --config $(CONFIG)
+
+wake-train:
+	$(PYTHON) -m ml.train_wake --config $(CONFIG)
+
+wake-reconstruct:
+	$(PYTHON) -m ml.reconstruct_wake --config $(CONFIG)
+
+wake-pipeline: wake-dataset wake-fields wake-train wake-reconstruct
+
 clean:
-	rm -rf data/raw/* data/features/features.csv reports/* models/* logs/*.log runs/openfoam/*
+	rm -rf data/raw/* data/features/features.csv data/wake_fields/* reports/* models/* logs/*.log runs/openfoam/*

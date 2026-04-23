@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,9 @@ DEFAULT_CONFIG_PATH = Path("configs/default.yaml")
 
 
 def repo_root() -> Path:
+    override = os.environ.get("FLUID_SHAPE_PIPELINE_ROOT")
+    if override:
+        return Path(override).expanduser().resolve()
     return Path(__file__).resolve().parents[1]
 
 
