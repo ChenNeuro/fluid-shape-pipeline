@@ -51,9 +51,9 @@ class WakePipelineSmokeTest(unittest.TestCase):
             self.assertTrue(metadata_path.exists(), metadata_path)
 
             field_payload = np.load(field_path)
-            self.assertEqual(int(field_payload["field_raw"].shape[0]), 4)
-            self.assertEqual(int(field_payload["crops"].shape[0]), 4)
-            self.assertEqual(int(field_payload["crops"].shape[1]), 4)
+            self.assertEqual(int(field_payload["field_raw"].shape[0]), 4)  # 4 channels
+            self.assertEqual(int(field_payload["crops"].shape[0]), 3)  # 3 scales: dist1.0_full/half/quarter
+            self.assertEqual(int(field_payload["crops"].shape[1]), 4)  # 4 channels
 
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
             self.assertIn("field_channels", metadata)

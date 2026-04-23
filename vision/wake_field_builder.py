@@ -79,10 +79,80 @@ def _hotspot_box(vorticity: np.ndarray) -> list[float]:
     return [x0 / width, y0 / height, x1 / width, y1 / height]
 
 
-def build_crop_boxes(vorticity: np.ndarray, scales: list[str]) -> dict[str, list[float]]:
+def parse_distance_scale(name: str) -> tuple[float, str] | None:
+    """Parse 'dist1.0_full', 'dist0.5_half' etc. Returns (downstream_h, height_mode) or None."""
+    prefix = "dist"
+    if not name.startswith(prefix):
+        return None
+    rest = name[len(prefix):]
+    parts = rest.rsplit("_", 1)
+    if len(parts) != 2:
+        return None
+    try:
+        downstream_h = float(parts[0])
+        height_mode = parts[1]
+        return downstream_h, height_mode
+    except ValueError:
+        return None
+
+
+def build_distance_crop_box(
+    *,
+    downstream_h: float,
+    height_mode: str,
+    canvas_x_start: float,
+    canvas_x_end: float,
+    canvas_y_min: float,
+    canvas_y_max: float,
+) -> list[float]:
+    """
+    Build a crop box for distance-parameterized scale.
+    downstream_h: how many channel half-heights downstream of obstacle to start (x_start)
+    height_mode: 'full' (100%), 'half' (50%), 'quarter' (25%) of canvas height
+    All coordinates are [x0, y0, x1, y1] in normalized canvas space [0,1].
+    """
+    # x: start at canvas_x_start + downstream_h * h, end at canvas_x_end
+    h_canvas = canvas_y_max - canvas_y_min
+    x_start_phys = canvas_x_start + downstream_h * h_canvas
+    x_end_phys = canvas_x_end
+    x0_norm = np.clip((x_start_phys - canvas_x_start) / (canvas_x_end - canvas_x_start), 0.0, 1.0)
+    x1_norm = 1.0  # always extend to right edge of canvas
+
+    # y: centered on canvas middle, fraction of canvas height
+    height_frac = {"full": 1.0, "half": 0.5, "quarter": 0.25}.get(height_mode, 1.0)
+    canvas_y_center = (canvas_y_min + canvas_y_max) * 0.5
+    y_half = (canvas_y_max - canvas_y_min) * 0.5 * height_frac
+    y0_phys = canvas_y_center - y_half
+    y1_phys = canvas_y_center + y_half
+    y0_norm = np.clip((y0_phys - canvas_y_min) / (canvas_y_max - canvas_y_min), 0.0, 1.0)
+    y1_norm = np.clip((y1_phys - canvas_y_min) / (canvas_y_max - canvas_y_min), 0.0, 1.0)
+
+    return [float(x0_norm), float(y0_norm), float(x1_norm), float(y1_norm)]
+
+
+def build_crop_boxes(
+    vorticity: np.ndarray,
+    scales: list[str],
+    *,
+    canvas_x_start: float = 0.0,
+    canvas_x_end: float = 1.0,
+    canvas_y_min: float = 0.0,
+    canvas_y_max: float = 1.0,
+) -> dict[str, list[float]]:
     boxes: dict[str, list[float]] = {}
     for scale in scales:
-        if scale == "full":
+        parsed = parse_distance_scale(scale)
+        if parsed is not None:
+            downstream_h, height_mode = parsed
+            boxes[scale] = build_distance_crop_box(
+                downstream_h=downstream_h,
+                height_mode=height_mode,
+                canvas_x_start=canvas_x_start,
+                canvas_x_end=canvas_x_end,
+                canvas_y_min=canvas_y_min,
+                canvas_y_max=canvas_y_max,
+            )
+        elif scale == "full":
             boxes[scale] = [0.0, 0.0, 1.0, 1.0]
         elif scale == "half":
             boxes[scale] = [0.0, 0.0, 0.5, 1.0]
@@ -145,7 +215,21 @@ def build_case_wake_field(case_dir: Path, cfg: dict) -> dict:
     field_norm, channel_mean, channel_std = normalize_field(field_raw)
 
     vorticity_idx = channel_names.index("vorticity")
-    crop_boxes = build_crop_boxes(field_raw[vorticity_idx], scales=scales)
+    # wake_roi lives in metadata.json (written by synthetic_solver), not in frames npz
+    metadata_for_roi = read_metadata(case_dir)
+    wake_roi_meta = metadata_for_roi.get("wake_roi", {})
+    canvas_x_start = float(wake_roi_meta.get("x_min", 0.0))
+    canvas_x_end = float(wake_roi_meta.get("x_max", 1.0))
+    canvas_y_min = float(wake_roi_meta.get("y_min", 0.0))
+    canvas_y_max = float(wake_roi_meta.get("y_max", 1.0))
+    crop_boxes = build_crop_boxes(
+        field_raw[vorticity_idx],
+        scales=scales,
+        canvas_x_start=canvas_x_start,
+        canvas_x_end=canvas_x_end,
+        canvas_y_min=canvas_y_min,
+        canvas_y_max=canvas_y_max,
+    )
     crops = np.stack([resize_crop(field_norm, crop_boxes[scale], output_size=field_size) for scale in scales], axis=0)
 
     wake_field_path = case_dir / WAKE_FIELD_FILENAME
@@ -166,11 +250,16 @@ def build_case_wake_field(case_dir: Path, cfg: dict) -> dict:
     metadata = read_metadata(case_dir)
     metadata["field_channels"] = channel_names
     metadata["crop_boxes"] = crop_boxes
+    metadata["field_canvas"] = {
+        "x_start": canvas_x_start,
+        "x_end": canvas_x_end,
+        "y_min": canvas_y_min,
+        "y_max": canvas_y_max,
+    }
     metadata.setdefault("files", {})
     metadata["files"]["wake_field_npz"] = WAKE_FIELD_FILENAME
     write_metadata(case_dir, metadata)
 
-    wake_roi = metadata.get("wake_roi", {})
     row = {
         "case_id": str(metadata["case_id"]),
         "shape": str(metadata["shape"]),
@@ -184,10 +273,10 @@ def build_case_wake_field(case_dir: Path, cfg: dict) -> dict:
         "channels": "|".join(channel_names),
         "scales": "|".join(scales),
         "flow_pair_count": int(pairwise_flows.shape[0]),
-        "wake_x_min": float(wake_roi.get("x_min", 0.0)),
-        "wake_x_max": float(wake_roi.get("x_max", 0.0)),
-        "wake_y_min": float(wake_roi.get("y_min", 0.0)),
-        "wake_y_max": float(wake_roi.get("y_max", 0.0)),
+        "canvas_x_start": canvas_x_start,
+        "canvas_x_end": canvas_x_end,
+        "canvas_y_min": canvas_y_min,
+        "canvas_y_max": canvas_y_max,
     }
     for scale, box in crop_boxes.items():
         row[f"{scale}_box"] = "|".join(f"{value:.6f}" for value in box)

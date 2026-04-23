@@ -8,11 +8,13 @@ import numpy as np
 import pandas as pd
 import torch
 
-from ml.wake_common import accuracy_f1, clip_params, obstacle_iou_and_dice, render_targets, VARIANTS
+from ml.wake_common import accuracy_f1, build_label_maps, clip_params, obstacle_iou_and_dice, render_targets, VARIANTS
 from sim.config import load_config, repo_root
 from sim.logging_utils import setup_logger
 from vision.wake_dataset import load_wake_bundle, variant_tensor
 from vision.wake_model import MultiScaleWakeNet, select_device
+from vision.mae_vit_model import MultiScaleViTWakeNet
+from vision.diff_renderer import DifferentiableShapeRenderer
 
 
 def parse_args() -> argparse.Namespace:
@@ -87,13 +89,21 @@ def _write_summary(
         f"- Shape macro F1: {metrics['macro_f1']:.4f}",
         f"- dy MAE: {metrics['dy_mae']:.5f}",
         f"- eps MAE: {metrics['eps_mae']:.5f}",
-        f"- Inverse obstacle IoU: {metrics['inverse_iou']:.4f}",
-        f"- Inverse obstacle Dice: {metrics['inverse_dice']:.4f}",
+        f"- Inverse obstacle IoU (binary): {metrics['inverse_iou']:.4f}",
+        f"- Inverse obstacle Dice (binary): {metrics['inverse_dice']:.4f}",
+    ]
+    if "soft_iou" in metrics:
+        lines.append(f"- Soft IoU (diff-renderer): {metrics['soft_iou']:.4f}")
+        lines.append(f"- Soft Dice (diff-renderer): {metrics['soft_dice']:.4f}")
+    lines.extend([
         "",
         "## Sanity",
         f"- Ground-truth render self-check IoU: {sanity_metrics['inverse_iou']:.4f}",
         f"- Ground-truth render self-check Dice: {sanity_metrics['inverse_dice']:.4f}",
-    ]
+    ])
+    if "soft_iou" in sanity_metrics:
+        lines.append(f"- Soft IoU self-check: {sanity_metrics['soft_iou']:.4f}")
+        lines.append(f"- Soft Dice self-check: {sanity_metrics['soft_dice']:.4f}")
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -108,6 +118,7 @@ def main() -> None:
         raise FileNotFoundError(f"Missing wake-field model pack: {model_path}. Run ml.train_wake first.")
 
     bundle = load_wake_bundle()
+    label_maps = build_label_maps(bundle)
     device = select_device()
     batch_size = int(cfg.get("vision", {}).get("training", {}).get("batch_size", 16))
     reports_dir = root / "reports"
@@ -123,12 +134,33 @@ def main() -> None:
     case_to_idx = {case_id: idx for idx, case_id in enumerate(bundle.case_ids.tolist())}
     idx_test = np.asarray([case_to_idx[case_id] for case_id in pack["test_case_ids"]], dtype=int)
 
-    model = MultiScaleWakeNet(**pack["model_kwargs"]).to(device)
+    model_type = str(pack.get("model_type", "resnet18"))
+    if model_type == "mae_vit":
+        model = MultiScaleViTWakeNet(**pack["model_kwargs"]).to(device)
+    else:
+        model = MultiScaleWakeNet(**pack["model_kwargs"]).to(device)
     model.load_state_dict(pack["state_dict"])
+
+    # Soft metrics via DifferentiableShapeRenderer (when model uses ViT or renderer available)
+    renderer = None
+    if model_type == "mae_vit":
+        sim_cfg = cfg["simulation"]
+        rec_cfg = cfg["reconstruction"]
+        renderer = DifferentiableShapeRenderer(
+            image_size=int(rec_cfg.get("image_height", 64)),
+            l_total=float(sim_cfg.get("L_in", 5.0)) + float(sim_cfg.get("L_out", 5.0)),
+            h=float(sim_cfg.get("H", 1.0)),
+            d_ratio=float(sim_cfg.get("d_ratio", 0.2)),
+            x0=float(sim_cfg.get("x0", 3.0)),
+            y0=float(sim_cfg.get("y0", 0.5)),
+            eps_max=float(sim_cfg.get("perturb", {}).get("eps_max", 0.06)),
+        ).to(device)
+        renderer.eval()
 
     pred = _predict(model, x_all[idx_test], batch_size=batch_size, device=device)
     shape_labels = list(pack["shape_labels"])
-    shape_pred = np.asarray([shape_labels[int(idx)] for idx in np.argmax(pred["shape_logits"], axis=1)], dtype=object)
+    shape_pred_idx = np.argmax(pred["shape_logits"], axis=1)
+    shape_pred = np.asarray([shape_labels[int(idx)] for idx in shape_pred_idx], dtype=object)
     dy_pred, eps_pred = clip_params(pred["params_pred"][:, 0], pred["params_pred"][:, 1], cfg)
 
     dy_true = bundle.dy[idx_test]
@@ -142,6 +174,25 @@ def main() -> None:
     threshold = float(cfg["reconstruction"].get("obstacle_threshold", 0.8))
     inv_metrics = obstacle_iou_and_dice(targets, predictions, threshold=threshold)
     sanity_metrics = obstacle_iou_and_dice(targets, sanity_predictions, threshold=threshold)
+
+    # Soft metrics from differentiable renderer (available for both model types)
+    soft_metrics = None
+    soft_sanity = None
+    if renderer is not None:
+        with torch.no_grad():
+            shape_indices = torch.from_numpy(shape_pred_idx).long().to(device)
+            dy_t = torch.from_numpy(dy_pred.astype(np.float32)).to(device)
+            eps_t = torch.from_numpy(eps_pred.astype(np.float32)).to(device)
+            pred_soft = renderer.render(shape_indices, dy_t, eps_t)
+
+            true_shape_idx = np.asarray([label_maps.shape_to_idx[s] for s in shapes_true], dtype=np.int64)
+            true_shape_t = torch.from_numpy(true_shape_idx).long().to(device)
+            true_dy_t = torch.from_numpy(dy_true.astype(np.float32)).to(device)
+            true_eps_t = torch.from_numpy(eps_true.astype(np.float32)).to(device)
+            target_soft = renderer.render(true_shape_t, true_dy_t, true_eps_t)
+            soft_metrics = renderer.eval_soft_metrics(pred_soft, target_soft)
+            soft_sanity = renderer.eval_soft_metrics(pred_soft, pred_soft)
+
     cls_metrics = accuracy_f1(shapes_true, shape_pred)
 
     case_rows = []
@@ -180,10 +231,16 @@ def main() -> None:
         "inverse_iou": inv_metrics["iou_mean"],
         "inverse_dice": inv_metrics["dice_mean"],
     }
+    if soft_metrics is not None:
+        summary_metrics["soft_iou"] = soft_metrics["soft_iou"]
+        summary_metrics["soft_dice"] = soft_metrics["soft_dice"]
     sanity_summary = {
         "inverse_iou": sanity_metrics["iou_mean"],
         "inverse_dice": sanity_metrics["dice_mean"],
     }
+    if soft_sanity is not None:
+        sanity_summary["soft_iou"] = soft_sanity["soft_iou"]
+        sanity_summary["soft_dice"] = soft_sanity["soft_dice"]
 
     _plot_examples(
         case_ids=bundle.case_ids[idx_test],

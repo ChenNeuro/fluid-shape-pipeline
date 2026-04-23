@@ -1,0 +1,3 @@
+2026-04-23 11:16:15,340 | INFO | reconstruct_wake | Wake-field reconstruction done. acc=0.5222 macro_f1=0.4366 iou=0.2688 dice=0.3606 report=/mnt/c/Users/chenyihao/Documents/GitHub/fluid-shape-pipeline/reports/wake_field_reconstruction_summary.md
+2026-04-23 14:51:03,655 | INFO | reconstruct_wake | Wake-field reconstruction done. acc=0.8111 macro_f1=0.8052 iou=0.4516 dice=0.5616 report=/mnt/c/Users/chenyihao/Documents/GitHub/fluid-shape-pipeline/reports/wake_field_reconstruction_summary.md
+2026-04-23 19:33:45,308 | INFO | reconstruct_wake | Wake-field reconstruction done. acc=0.9111 macro_f1=0.9089 iou=0.3833 dice=0.4871 report=/mnt/c/Users/chenyihao/Documents/GitHub/fluid-shape-pipeline/reports/wake_field_reconstruction_summary.md

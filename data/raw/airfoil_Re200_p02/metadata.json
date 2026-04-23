@@ -70,6 +70,57 @@
     "noise_std": 0.05399999999999999
   },
   "files": {
-    "probes_csv": "probes.csv"
+    "probes_csv": "probes.csv",
+    "wake_frames_npz": "wake_frames.npz",
+    "wake_field_npz": "wake_field.npz"
+  },
+  "steady_frame_range": {
+    "sample_index_start": 3755,
+    "sample_index_end": 3790,
+    "t_start": 37.54999923706055,
+    "t_end": 37.900001525878906,
+    "n_frames": 8
+  },
+  "wake_roi": {
+    "x_min": 3.1,
+    "x_max": 10.0,
+    "y_min": -0.030000000000000027,
+    "y_max": 1.03,
+    "width": 6.9,
+    "height": 1.06,
+    "pixels_x": 128,
+    "pixels_y": 128
+  },
+  "field_channels": [
+    "ux",
+    "uy",
+    "speed",
+    "vorticity"
+  ],
+  "crop_boxes": {
+    "dist0.5_full": [
+      0.07681159420289851,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "dist1.0_full": [
+      0.1536231884057971,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "dist2.0_full": [
+      0.3072463768115943,
+      0.0,
+      1.0,
+      1.0
+    ]
+  },
+  "field_canvas": {
+    "x_start": 3.1,
+    "x_end": 10.0,
+    "y_min": -0.030000000000000027,
+    "y_max": 1.03
   }
 }

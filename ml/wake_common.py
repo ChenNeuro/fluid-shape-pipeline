@@ -13,25 +13,19 @@ from vision.wake_dataset import WakeBundle
 META_COLS = ["case_id", "shape", "Re", "dy", "eps", "seed"]
 
 VARIANTS = {
-    "full_only_4ch": {
-        "scales": ["full"],
+    # Distance-parameterized crops: dist{D}h_full
+    # dist1.0_full = 1.0h downstream from obstacle, full canvas height
+    # dist0.5_full = 0.5h downstream, full canvas height
+    # dist2.0_full = 2.0h downstream, full canvas height
+    "dist_single_4ch": {
+        "scales": ["dist1.0_full"],
         "channels": ["ux", "uy", "speed", "vorticity"],
-        "description": "Full only, 4 channels",
+        "description": "Single distance (1.0h), full-height crop",
     },
-    "full_half_quarter_4ch": {
-        "scales": ["full", "half", "quarter"],
+    "dist_multi_4ch": {
+        "scales": ["dist0.5_full", "dist1.0_full", "dist2.0_full"],
         "channels": ["ux", "uy", "speed", "vorticity"],
-        "description": "Full+half+quarter, 4 channels",
-    },
-    "full_half_quarter_hotspot_4ch": {
-        "scales": ["full", "half", "quarter", "hotspot"],
-        "channels": ["ux", "uy", "speed", "vorticity"],
-        "description": "Full+half+quarter+hotspot, 4 channels",
-    },
-    "full_half_quarter_hotspot_speed": {
-        "scales": ["full", "half", "quarter", "hotspot"],
-        "channels": ["speed"],
-        "description": "Full+half+quarter+hotspot, speed only",
+        "description": "Multi-distance (0.5h/1.0h/2.0h), all full-height",
     },
 }
 

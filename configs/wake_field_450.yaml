@@ -106,7 +106,7 @@ vision:
   field_size: 128
   channels: [ux, uy, speed, vorticity]
   flow_estimator: farneback
-  scales: [full, half, quarter, hotspot]
+  scales: [dist0.5_full, dist1.0_full, dist2.0_full]
   training:
     epochs: 8
     batch_size: 16
@@ -115,6 +115,16 @@ vision:
     fusion_hidden: 256
     dropout: 0.15
     export_seed: 42
+  mae_vit:
+    batch_size: 8
+    phase1_epochs: 8
+    phase1_lr: 0.0005
+    phase2_epochs: 12
+    phase2_base_lr: 3e-5
+    llrd_decay: 0.85
+    proj_dim: 512
+    fusion_hidden: 512
+    dropout: 0.2
 
 reconstruction:
   image_height: 64

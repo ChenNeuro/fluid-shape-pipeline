@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wake-Field Shape Classifier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --accent: #58a6ff;
+    --accent2: #a371f7;
+    --circle: #58a6ff;
+    --triangle: #f97583;
+    --airfoil: #d2a8ff;
+    --diamond: #56d364;
+    --bar: #ffa657;
+    --ok: #3fb950;
+    --err: #f85149;
+    --card: #21262d;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ── Header ── */
+  header {
+    width: 100%;
+    max-width: 1100px;
+    padding: 28px 24px 16px;
+    text-align: center;
+  }
+  header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }
+  header p {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  header .badge {
+    display: inline-block;
+    background: rgba(88,166,255,0.15);
+    border: 1px solid rgba(88,166,255,0.3);
+    color: var(--accent);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 8px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── Main layout ── */
+  main {
+    width: 100%;
+    max-width: 1100px;
+    padding: 0 24px 40px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  .card-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-title .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  /* ── Visualization ── */
+  #viz-card {
+    grid-column: 1 / 2;
+    grid-row: 1 / 2;
+  }
+  #viz-img {
+    width: 100%;
+    border-radius: 8px;
+    display: block;
+    min-height: 200px;
+    background: #1a1a2e;
+  }
+  #viz-placeholder {
+    width: 100%;
+    height: 260px;
+    background: #1a1a2e;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  /* ── Controls ── */
+  #ctrl-card {
+    grid-column: 2 / 3;
+    grid-row: 1 / 2;
+  }
+
+  .ctrl-section {
+    margin-bottom: 18px;
+  }
+  .ctrl-label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .ctrl-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(88,166,255,0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  /* Shape selector */
+  .shape-btns {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .shape-btn {
+    flex: 1;
+    min-width: 60px;
+    padding: 8px 4px;
+    border-radius: 8px;
+    border: 2px solid var(--border);
+    background: var(--card);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+  }
+  .shape-btn:hover { border-color: var(--muted); color: var(--text); }
+  .shape-btn.active {
+    color: white;
+    transform: scale(1.04);
+  }
+  .shape-btn[data-shape="circle"].active   { background: var(--circle);   border-color: var(--circle); }
+  .shape-btn[data-shape="triangle"].active { background: var(--triangle);  border-color: var(--triangle); }
+  .shape-btn[data-shape="airfoil"].active  { background: var(--airfoil);   border-color: var(--airfoil); }
+  .shape-btn[data-shape="diamond"].active  { background: var(--diamond);   border-color: var(--diamond); }
+  .shape-btn[data-shape="bar"].active      { background: var(--bar);       border-color: var(--bar); }
+
+  /* Range sliders */
+  .range-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+
+  /* ── Prediction ── */
+  #pred-card {
+    grid-column: 1 / 3;
+    grid-row: 2 / 3;
+  }
+
+  #pred-area {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .pred-main {
+    text-align: center;
+    min-width: 140px;
+  }
+  .pred-shape {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-bottom: 4px;
+    transition: color 0.2s;
+  }
+  .pred-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .pred-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .pred-badge.ok   { background: rgba(63,185,80,0.15); color: var(--ok); border: 1px solid rgba(63,185,80,0.3); }
+  .pred-badge.err { background: rgba(248,81,73,0.15); color: var(--err); border: 1px solid rgba(248,81,73,0.3); }
+
+  .conf-bars { flex: 1; }
+  .conf-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .conf-name {
+    font-size: 12px;
+    font-weight: 600;
+    width: 70px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .conf-track {
+    flex: 1;
+    height: 8px;
+    background: var(--card);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .conf-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+  }
+  .conf-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    width: 44px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .param-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .param-item {
+    background: var(--card);
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .param-label { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+  .param-value { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; }
+  .param-true  { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Predict button ── */
+  #predict-btn {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    margin-top: 16px;
+    background: linear-gradient(135deg, #1f6feb, #a371f7);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    letter-spacing: 0.3px;
+  }
+  #predict-btn:hover { opacity: 0.9; }
+  #predict-btn:active { transform: scale(0.98); }
+  #predict-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Footer ── */
+  footer {
+    width: 100%;
+    max-width: 1100px;
+    padding: 0 24px 32px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 700px) {
+    main { grid-template-columns: 1fr; }
+    #viz-card, #ctrl-card, #pred-card { grid-column: 1; }
+    #pred-card { grid-row: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Wake-Field Shape Classifier <span class="badge">Realtime</span></h1>
+  <p>Control the upstream obstacle parameters and see the model prediction in real time</p>
+</header>
+
+<main>
+  <!-- Visualization -->
+  <div class="card" id="viz-card">
+    <div class="card-title"><span class="dot"></span>Vorticity Field (ω)</div>
+    <div id="viz-placeholder">Adjust parameters and press Predict</div>
+    <img id="viz-img" style="display:none" alt="Vorticity visualization">
+  </div>
+
+  <!-- Controls -->
+  <div class="card" id="ctrl-card">
+    <div class="card-title"><span class="dot"></span>Obstacle Parameters</div>
+
+    <div class="ctrl-section">
+      <div class="ctrl-label">Shape (ground truth)</div>
+      <div class="shape-btns">
+        <button class="shape-btn active" data-shape="circle">●<br>Circle</button>
+        <button class="shape-btn" data-shape="triangle">▲<br>Triangle</button>
+        <button class="shape-btn" data-shape="airfoil">✈<br>Airfoil</button>
+        <button class="shape-btn" data-shape="diamond">◆<br>Diamond</button>
+        <button class="shape-btn" data-shape="bar">▬<br>Bar</button>
+      </div>
+    </div>
+
+    <div class="ctrl-section">
+      <div class="ctrl-label">
+        Reynolds Number
+        <span class="ctrl-value" id="re-val">Re = 100</span>
+      </div>
+      <div class="range-row">
+        <span style="font-size:11px;color:var(--muted)">100</span>
+        <input type="range" id="re-slider" min="100" max="300" step="100" value="100">
+        <span style="font-size:11px;color:var(--muted)">300</span>
+      </div>
+    </div>
+
+    <div class="ctrl-section">
+      <div class="ctrl-label">
+        Vertical Offset dy
+        <span class="ctrl-value" id="dy-val">dy = 0.000</span>
+      </div>
+      <div class="range-row">
+        <span style="font-size:11px;color:var(--muted)">−0.05</span>
+        <input type="range" id="dy-slider" min="-0.05" max="0.05" step="0.005" value="0">
+        <span style="font-size:11px;color:var(--muted)">+0.05</span>
+      </div>
+    </div>
+
+    <div class="ctrl-section">
+      <div class="ctrl-label">
+        Perturbation ε
+        <span class="ctrl-value" id="eps-val">ε = 0.000</span>
+      </div>
+      <div class="range-row">
+        <span style="font-size:11px;color:var(--muted)">−0.06</span>
+        <input type="range" id="eps-slider" min="-0.06" max="0.06" step="0.005" value="0">
+        <span style="font-size:11px;color:var(--muted)">+0.06</span>
+      </div>
+    </div>
+
+    <button id="predict-btn" onclick="doPredict()">Classify Obstacle Shape</button>
+  </div>
+
+  <!-- Prediction results -->
+  <div class="card" id="pred-card">
+    <div class="card-title"><span class="dot"></span>Classification Result</div>
+    <div id="pred-area">
+      <div class="pred-main">
+        <div class="pred-shape" id="pred-shape-txt" style="color:var(--muted)">—</div>
+        <div class="pred-sub" id="pred-sub-txt">awaiting prediction</div>
+        <div id="pred-badge"></div>
+      </div>
+      <div class="conf-bars">
+        <div id="conf-container">
+          <div style="font-size:12px;color:var(--muted);padding:20px 0;text-align:center">
+            Confidence scores will appear here after prediction
+          </div>
+        </div>
+        <div class="param-grid" id="param-grid" style="display:none">
+          <div class="param-item">
+            <div class="param-label">Predicted dy</div>
+            <div class="param-value" id="pv-dy">—</div>
+          </div>
+          <div class="param-item">
+            <div class="param-label">Predicted ε</div>
+            <div class="param-value" id="pv-eps">—</div>
+          </div>
+          <div class="param-item">
+            <div class="param-label">Predicted Re</div>
+            <div class="param-value" id="pv-re">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  Wake-field shape classifier · ResNet18 multi-scale · 450 synthetic cases · Re ∈ {100, 200, 300}
+</footer>
+
+<script>
+const SHAPE_COLORS = {
+  circle:   '#58a6ff',
+  triangle: '#f97583',
+  airfoil:  '#d2a8ff',
+  diamond:  '#56d364',
+  bar:      '#ffa657',
+};
+
+// Shape buttons
+document.querySelectorAll('.shape-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+// Slider value displays
+const sliders = [
+  { id: 're-slider',  valId: 're-val',  fmt: v => `Re = ${v}` },
+  { id: 'dy-slider',   valId: 'dy-val',  fmt: v => `dy = ${parseFloat(v).toFixed(3)}` },
+  { id: 'eps-slider', valId: 'eps-val', fmt: v => `ε = ${parseFloat(v).toFixed(3)}` },
+];
+sliders.forEach(({ id, valId, fmt }) => {
+  const el = document.getElementById(id);
+  const valEl = document.getElementById(valId);
+  el.addEventListener('input', () => { valEl.textContent = fmt(el.value); });
+});
+
+let seed = 0;
+let predicting = false;
+
+async function doPredict() {
+  if (predicting) return;
+  predicting = true;
+
+  const btn = document.getElementById('predict-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Computing...';
+
+  const shape = document.querySelector('.shape-btn.active').dataset.shape;
+  const re    = parseInt(document.getElementById('re-slider').value);
+  const dy    = parseFloat(document.getElementById('dy-slider').value);
+  const eps   = parseFloat(document.getElementById('eps-slider').value);
+
+  try {
+    const resp = await fetch('/api/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shape, re, dy, eps, seed }),
+    });
+    const data = await resp.json();
+    updateUI(data, shape, re, dy, eps);
+  } catch (e) {
+    alert('Request failed: ' + e.message);
+  }
+
+  predicting = false;
+  btn.disabled = false;
+  btn.innerHTML = 'Classify Obstacle Shape';
+  seed++;
+}
+
+function updateUI(data, trueShape, trueRe, trueDy, trueEps) {
+  // Show vorticity image
+  if (data.vorticity_img) {
+    document.getElementById('viz-placeholder').style.display = 'none';
+    const img = document.getElementById('viz-img');
+    img.src = data.vorticity_img;
+    img.style.display = 'block';
+  }
+
+  if (!data.success) {
+    document.getElementById('pred-shape-txt').textContent = 'No Model';
+    document.getElementById('pred-sub-txt').textContent = data.error || 'unknown error';
+    document.getElementById('conf-container').innerHTML =
+      '<div style="font-size:12px;color:var(--muted);padding:20px 0;text-align:center">Model not loaded — run training first</div>';
+    return;
+  }
+
+  const predShape = data.shape;
+  const correct = trueShape === predShape;
+
+  // Main prediction display
+  const shapeEl = document.getElementById('pred-shape-txt');
+  shapeEl.textContent = predShape.toUpperCase();
+  shapeEl.style.color = SHAPE_COLORS[predShape] || 'var(--accent)';
+
+  document.getElementById('pred-sub-txt').textContent =
+    `Confidence: ${(data.shape_probs[predShape] * 100).toFixed(1)}%`;
+
+  const badge = document.getElementById('pred-badge');
+  badge.className = 'pred-badge ' + (correct ? 'ok' : 'err');
+  badge.textContent = correct ? '✓ CORRECT' : '✗ WRONG';
+
+  // Confidence bars
+  const sorted = Object.entries(data.shape_probs).sort((a, b) => b[1] - a[1]);
+  const container = document.getElementById('conf-container');
+  container.innerHTML = sorted.map(([s, p]) => {
+    const c = SHAPE_COLORS[s] || '#7d8590';
+    const isPred = s === predShape;
+    const bold = isPred ? 'font-weight:700' : '';
+    return `
+      <div class="conf-bar-row">
+        <div class="conf-name" style="color:${c};${bold}">${s}</div>
+        <div class="conf-track">
+          <div class="conf-fill" style="width:${(p * 100).toFixed(1)}%;background:${c}"></div>
+        </div>
+        <div class="conf-pct">${(p * 100).toFixed(1)}%</div>
+      </div>`;
+  }).join('');
+
+  // Parameter predictions
+  document.getElementById('param-grid').style.display = 'grid';
+  document.getElementById('pv-dy').textContent  = data.dy.toFixed(3);
+  document.getElementById('pv-eps').textContent = data.eps.toFixed(3);
+  document.getElementById('pv-re').textContent   = `Re ${data.re}`;
+}
+
+// Trigger predict on Enter for any slider
+document.querySelectorAll('input[type=range]').forEach(el => {
+  el.addEventListener('keypress', e => { if (e.key === 'Enter') doPredict(); });
+});
+</script>
+</body>
+</html>
