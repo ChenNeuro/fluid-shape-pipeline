@@ -3,15 +3,15 @@
   "backend": "synthetic",
   "shape": "bar",
   "Re": 100,
-  "dy": -0.025078106122844293,
-  "eps": 0.00846569741171725,
-  "seed": 224003165,
+  "dy": -0.008491870337663604,
+  "eps": 0.028647223258977457,
+  "seed": 2002046236,
   "geometry": {
     "H": 1.0,
     "d": 0.2,
     "x0": 3.0,
     "y0_nominal": 0.5,
-    "y0_actual": 0.4749218938771557,
+    "y0_actual": 0.49150812966233637,
     "L_in": 5.0,
     "L_out": 5.0,
     "L_total": 10.0
@@ -59,15 +59,15 @@
   },
   "sampling": {
     "dt": 0.01,
-    "n_samples": 6524,
+    "n_samples": 5506,
     "t_start": 0.0,
-    "t_end": 65.22999999999999,
-    "transient_steps": 2610,
-    "f0_est": 0.3065788419390631
+    "t_end": 55.05,
+    "transient_steps": 2203,
+    "f0_est": 0.3632499951439088
   },
   "synthetic_profile": {
     "challenge_enabled": true,
-    "noise_std": 0.05399999999999999
+    "noise_std": 0.0336
   },
   "files": {
     "probes_csv": "probes.csv",
@@ -75,19 +75,19 @@
     "wake_field_npz": "wake_field.npz"
   },
   "steady_frame_range": {
-    "sample_index_start": 6488,
-    "sample_index_end": 6523,
-    "t_start": 64.87999725341797,
-    "t_end": 65.2300033569336,
+    "sample_index_start": 5470,
+    "sample_index_end": 5505,
+    "t_start": 54.70000076293945,
+    "t_end": 55.04999923706055,
     "n_frames": 8
   },
   "wake_roi": {
     "x_min": 3.1,
     "x_max": 10.0,
-    "y_min": -0.030000000000000027,
-    "y_max": 1.03,
+    "y_min": -0.020000000000000018,
+    "y_max": 1.02,
     "width": 6.9,
-    "height": 1.06,
+    "height": 1.04,
     "pixels_x": 128,
     "pixels_y": 128
   },
@@ -99,19 +99,19 @@
   ],
   "crop_boxes": {
     "dist0.5_full": [
-      0.07681159420289851,
+      0.07246376811594203,
       0.0,
       1.0,
       1.0
     ],
     "dist1.0_full": [
-      0.1536231884057971,
+      0.14492753623188398,
       0.0,
       1.0,
       1.0
     ],
     "dist2.0_full": [
-      0.3072463768115943,
+      0.289855072463768,
       0.0,
       1.0,
       1.0
@@ -120,7 +120,7 @@
   "field_canvas": {
     "x_start": 3.1,
     "x_end": 10.0,
-    "y_min": -0.030000000000000027,
-    "y_max": 1.03
+    "y_min": -0.020000000000000018,
+    "y_max": 1.02
   }
 }

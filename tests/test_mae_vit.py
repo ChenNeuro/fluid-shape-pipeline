@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 import torch
 
-from vision.mae_vit_model import MAEViTEncoder, MultiScaleViTWakeNet, select_device
 from vision.diff_renderer import DifferentiableShapeRenderer
+from vision.mae_vit_model import MAEViTEncoder, MultiScaleViTWakeNet, select_device
 
 
 class TestMAEViTForward:
@@ -52,9 +52,6 @@ class TestMAEViTForward:
 
 class TestDiffRenderer:
     def test_circle_render_produces_valid_mask(self):
-        # Circle d=0.2m in a 10m wide, ~1m tall domain → very small (3% of width)
-        # With transition_px=2, mask goes [0,1] over ~0.16m
-        # Self-match Dice ~0.73 (not 1.0) because transition zone isn't fully sharp
         renderer = DifferentiableShapeRenderer(image_size=128, transition_px=2)
         renderer.eval()
         shape_idx = torch.tensor([0])
@@ -64,7 +61,6 @@ class TestDiffRenderer:
         assert pred.shape == target.shape == (1, 1, 128, 128)
         assert 0.0 <= float(pred.min()) <= float(pred.max()) <= 1.0
         assert float(pred.max()) > 0.9, f"Circle mask should reach near 1.0, got {float(pred.max())}"
-        # Self-match Dice should be >0.7 (circle's true Dice is lower due to transition zone)
         assert float(loss) < 0.5, f"Loss = 1-Dice, expect ~0.27, got {float(loss)}"
 
     def test_airfoil_render_produces_valid_mask(self):
@@ -85,12 +81,10 @@ class TestDiffRenderer:
         masks = renderer.render(shape_idx, dy, eps)
         assert masks.shape == (5, 1, 128, 128)
         assert 0.0 <= float(masks.min()) <= float(masks.max()) <= 1.0
-        # All shapes should reach max > 0.5 (inside the shape)
         for i in range(5):
             assert float(masks[i].max()) > 0.5, f"Shape {i} mask should reach >0.5 (got max={float(masks[i].max()):.4f})"
 
     def test_different_shapes_produce_different_masks(self):
-        # Circle vs airfoil should produce clearly different masks (very different geometry)
         renderer = DifferentiableShapeRenderer(image_size=128, transition_px=1)
         m0 = renderer.render(torch.tensor([0]), torch.zeros(1), torch.zeros(1))
         m2 = renderer.render(torch.tensor([2]), torch.zeros(1), torch.zeros(1))
@@ -104,8 +98,14 @@ class TestDiffRenderer:
         diff = float((m0 - m1).abs().mean())
         assert diff > 0.001, f"dy shift should change mask (diff={diff})"
 
+    def test_eps_deformation_changes_mask(self):
+        renderer = DifferentiableShapeRenderer(image_size=128, transition_px=2)
+        m0 = renderer.render(torch.tensor([0]), torch.tensor([0.0]), torch.tensor([0.0]))
+        m1 = renderer.render(torch.tensor([0]), torch.tensor([0.0]), torch.tensor([0.05]))
+        diff = float((m0 - m1).abs().mean())
+        assert diff > 0.001, f"eps deformation should change full-geometry mask (diff={diff})"
+
     def test_backward_pass_creates_gradients(self):
-        # dy=0 and dy=1 produce very different masks → should give non-zero loss
         renderer = DifferentiableShapeRenderer(image_size=128, transition_px=2)
         renderer.train()
         shape_idx = torch.tensor([0, 0])
@@ -115,7 +115,8 @@ class TestDiffRenderer:
         loss, pred_mask, _ = renderer.render_and_loss(
             shape_idx, dy_pred, eps, shape_idx, dy_target, eps
         )
-        assert float(loss) > 0.001, "Mismatched params should produce non-zero loss"
+        assert pred_mask.shape == (2, 1, 128, 128)
+        assert float(loss.detach()) > 0.001, "Mismatched params should produce non-zero loss"
         loss.backward()
         assert dy_pred.grad is not None and dy_pred.grad.abs().sum() > 0, "dy gradient should be non-zero when masks differ"
 
@@ -124,7 +125,6 @@ class TestDiffRenderer:
         renderer.eval()
         shape_idx = torch.tensor([0])
         mask = renderer.render(shape_idx, torch.zeros(1), torch.zeros(1))
-        # Circle on 64x64 should reach max close to 1.0 (sharp inside)
         assert float(mask.max()) > 0.9, f"Circle mask should be nearly binary, got max={float(mask.max())}"
 
     def test_soft_dice_loss_bounded(self):
@@ -142,7 +142,7 @@ class TestDiffRenderer:
         dy = torch.tensor([0.05], requires_grad=True)
         eps = torch.zeros(1)
         loss, pred, target = renderer.render_and_loss(shape_idx, dy, eps, shape_idx, dy, eps)
-        # Self-match loss should be small but gradient should flow
+        assert pred.shape == target.shape == (1, 1, 64, 64)
         loss.backward()
         assert dy.grad is not None and dy.grad.abs().sum() > 0, "dy gradient should be non-zero"
 

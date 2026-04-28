@@ -1,3 +1,5 @@
 2026-04-23 11:12:09,757 | INFO | wake_fields | Wake-field build complete. rows=450 skipped=0 -> /mnt/c/Users/chenyihao/Documents/GitHub/fluid-shape-pipeline/data/wake_fields/index.csv
 2026-04-23 19:23:46,639 | INFO | wake_fields | Wake-field build complete. rows=450 skipped=0 -> /mnt/c/Users/chenyihao/Documents/GitHub/fluid-shape-pipeline/data/wake_fields/index.csv
 2026-04-23 19:27:46,132 | INFO | wake_fields | Wake-field build complete. rows=450 skipped=0 -> /mnt/c/Users/chenyihao/Documents/GitHub/fluid-shape-pipeline/data/wake_fields/index.csv
+2026-04-23 20:59:45,175 | INFO | wake_fields | Wake-field build complete. rows=30 skipped=0 -> /mnt/c/Users/chenyihao/Documents/GitHub/fluid-shape-pipeline/data/wake_fields/index.csv
+2026-04-23 23:49:51,432 | INFO | wake_fields | Wake-field build complete. rows=30 skipped=0 -> /mnt/c/Users/chenyihao/Documents/GitHub/fluid-shape-pipeline/data/wake_fields/index.csv

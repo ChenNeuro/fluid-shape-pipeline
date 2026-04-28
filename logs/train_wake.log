@@ -106,3 +106,27 @@
 2026-04-23 19:33:11,651 | INFO | train_wake | Leave-one-Re-out main variant Re=200 done. acc=0.9933 macro_f1=0.9933
 2026-04-23 19:33:22,834 | INFO | train_wake | Leave-one-Re-out main variant Re=300 done. acc=0.8600 macro_f1=0.8549
 2026-04-23 19:33:22,853 | INFO | train_wake | Wake-field training complete. main_variant=dist_multi_4ch summary=/mnt/c/Users/chenyihao/Documents/GitHub/fluid-shape-pipeline/reports/wake_field_summary.md
+2026-04-23 20:59:48,883 | INFO | train_wake | Training wake-field variant dist_single_4ch with backbone=resnet18
+2026-04-23 20:59:49,830 | INFO | train_wake | Variant dist_single_4ch seed=42 done. acc=0.2000 macro_f1=0.0667 dy_mae=0.03802 eps_mae=0.04147
+2026-04-23 20:59:49,831 | INFO | train_wake | Training wake-field variant dist_multi_4ch with backbone=resnet18
+2026-04-23 20:59:50,711 | INFO | train_wake | Variant dist_multi_4ch seed=42 done. acc=0.2000 macro_f1=0.0667 dy_mae=0.03802 eps_mae=0.04147
+2026-04-23 20:59:51,322 | INFO | train_wake | Leave-one-Re-out main variant Re=100 done. acc=0.2000 macro_f1=0.0667
+2026-04-23 20:59:51,609 | INFO | train_wake | Leave-one-Re-out main variant Re=200 done. acc=0.2000 macro_f1=0.0667
+2026-04-23 20:59:51,921 | INFO | train_wake | Leave-one-Re-out main variant Re=300 done. acc=0.2000 macro_f1=0.0667
+2026-04-23 20:59:51,936 | INFO | train_wake | Wake-field training complete. main_variant=dist_multi_4ch summary=/mnt/c/Users/chenyihao/Documents/GitHub/fluid-shape-pipeline/reports/wake_field_summary.md
+2026-04-23 23:50:03,484 | INFO | train_wake | Training wake-field variant dist_single_4ch with backbone=resnet18
+2026-04-23 23:50:05,401 | INFO | train_wake | Variant dist_single_4ch seed=42 done. acc=0.2000 macro_f1=0.0667 dy_mae=0.03802 eps_mae=0.04147
+2026-04-23 23:50:05,402 | INFO | train_wake | Training wake-field variant dist_multi_4ch with backbone=resnet18
+2026-04-23 23:50:06,309 | INFO | train_wake | Variant dist_multi_4ch seed=42 done. acc=0.2000 macro_f1=0.0667 dy_mae=0.03802 eps_mae=0.04147
+2026-04-23 23:50:06,920 | INFO | train_wake | Leave-one-Re-out main variant Re=100 done. acc=0.2000 macro_f1=0.0667
+2026-04-23 23:50:07,211 | INFO | train_wake | Leave-one-Re-out main variant Re=200 done. acc=0.2000 macro_f1=0.0800
+2026-04-23 23:50:07,519 | INFO | train_wake | Leave-one-Re-out main variant Re=300 done. acc=0.2000 macro_f1=0.0667
+2026-04-23 23:50:07,551 | INFO | train_wake | Wake-field training complete. main_variant=dist_multi_4ch summary=/mnt/c/Users/chenyihao/Documents/GitHub/fluid-shape-pipeline/reports/wake_field_summary.md
+2026-04-23 23:50:29,243 | INFO | train_wake | Training wake-field variant dist_single_4ch with backbone=resnet18
+2026-04-23 23:50:31,735 | INFO | train_wake | Variant dist_single_4ch seed=42 done. acc=0.2000 macro_f1=0.0667 dy_mae=0.03802 eps_mae=0.03853
+2026-04-23 23:50:31,735 | INFO | train_wake | Training wake-field variant dist_multi_4ch with backbone=resnet18
+2026-04-23 23:50:33,653 | INFO | train_wake | Variant dist_multi_4ch seed=42 done. acc=0.4000 macro_f1=0.2333 dy_mae=0.03802 eps_mae=0.04261
+2026-04-23 23:50:36,216 | INFO | train_wake | Leave-one-Re-out main variant Re=100 done. acc=0.2000 macro_f1=0.0667
+2026-04-23 23:50:38,498 | INFO | train_wake | Leave-one-Re-out main variant Re=200 done. acc=0.5000 macro_f1=0.4222
+2026-04-23 23:50:40,883 | INFO | train_wake | Leave-one-Re-out main variant Re=300 done. acc=0.2000 macro_f1=0.0667
+2026-04-23 23:50:40,913 | INFO | train_wake | Wake-field training complete. main_variant=dist_multi_4ch summary=/mnt/c/Users/chenyihao/Documents/GitHub/fluid-shape-pipeline/reports/wake_field_summary.md

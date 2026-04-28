@@ -100,6 +100,7 @@ def build_distance_crop_box(
     *,
     downstream_h: float,
     height_mode: str,
+    physical_h: float,
     canvas_x_start: float,
     canvas_x_end: float,
     canvas_y_min: float,
@@ -107,13 +108,12 @@ def build_distance_crop_box(
 ) -> list[float]:
     """
     Build a crop box for distance-parameterized scale.
-    downstream_h: how many channel half-heights downstream of obstacle to start (x_start)
+    downstream_h: how many channel heights downstream of the obstacle to start.
     height_mode: 'full' (100%), 'half' (50%), 'quarter' (25%) of canvas height
     All coordinates are [x0, y0, x1, y1] in normalized canvas space [0,1].
     """
-    # x: start at canvas_x_start + downstream_h * h, end at canvas_x_end
-    h_canvas = canvas_y_max - canvas_y_min
-    x_start_phys = canvas_x_start + downstream_h * h_canvas
+    # x: start at canvas_x_start + downstream_h * H, end at canvas_x_end
+    x_start_phys = canvas_x_start + downstream_h * physical_h
     x_end_phys = canvas_x_end
     x0_norm = np.clip((x_start_phys - canvas_x_start) / (canvas_x_end - canvas_x_start), 0.0, 1.0)
     x1_norm = 1.0  # always extend to right edge of canvas
@@ -134,6 +134,7 @@ def build_crop_boxes(
     vorticity: np.ndarray,
     scales: list[str],
     *,
+    physical_h: float,
     canvas_x_start: float = 0.0,
     canvas_x_end: float = 1.0,
     canvas_y_min: float = 0.0,
@@ -147,6 +148,7 @@ def build_crop_boxes(
             boxes[scale] = build_distance_crop_box(
                 downstream_h=downstream_h,
                 height_mode=height_mode,
+                physical_h=physical_h,
                 canvas_x_start=canvas_x_start,
                 canvas_x_end=canvas_x_end,
                 canvas_y_min=canvas_y_min,
@@ -225,6 +227,7 @@ def build_case_wake_field(case_dir: Path, cfg: dict) -> dict:
     crop_boxes = build_crop_boxes(
         field_raw[vorticity_idx],
         scales=scales,
+        physical_h=float(cfg["simulation"]["H"]),
         canvas_x_start=canvas_x_start,
         canvas_x_end=canvas_x_end,
         canvas_y_min=canvas_y_min,

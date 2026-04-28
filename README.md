@@ -18,10 +18,8 @@
 - synthetic backend 会在 `data/raw/<case_id>/` 额外写入 `wake_frames.npz`
 - `python -m extract.build_wake_fields --config configs/wake_field_450.yaml` 会生成 `wake_field.npz`
 - `python -m ml.train_wake --config configs/wake_field_450.yaml` 会比较多尺度变体：
-  - `full_only_4ch`
-  - `full_half_quarter_4ch`
-  - `full_half_quarter_hotspot_4ch`
-  - `full_half_quarter_hotspot_speed`
+  - `dist_single_4ch`
+  - `dist_multi_4ch`
 - `python -m ml.reconstruct_wake --config configs/wake_field_450.yaml` 会输出 canonical inverse reconstruction 报告
 
 推荐命令：
@@ -130,7 +128,7 @@ Pattern audit: permutation null distribution:
 ## 1. Environment
 
 - Python 3.11
-- Dependencies: `numpy scipy pandas scikit-learn matplotlib pyyaml`
+- Dependencies: `numpy scipy pandas scikit-learn matplotlib pyyaml torch torchvision opencv-python-headless timm pytest`
 
 ```bash
 python -m venv .venv

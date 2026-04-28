@@ -46,7 +46,12 @@
       "Bash(curl -v -X POST http://127.0.0.1:5000/api/predict -H 'Content-Type: application/json' -d '{\"shape\":\"circle\",\"re\":100,\"dy\":0.0,\"eps\":0.0}')",
       "Bash(curl -s -X POST http://127.0.0.1:5000/api/predict -H 'Content-Type: application/json' -d '{\"shape\":\"__TRACKED_VAR__\",\"re\":100,\"dy\":0.0,\"eps\":0.0}')",
       "Bash(curl -s -X POST http://127.0.0.1:5000/api/predict -H 'Content-Type: application/json' -d '{\"shape\":\"diamond\",\"re\":200,\"dy\":0.0,\"eps\":0.0}')",
-      "Bash(curl -s -X POST http://127.0.0.1:5000/api/predict -H 'Content-Type: application/json' -d '{\"shape\":\"__TRACKED_VAR__\",\"re\":200,\"dy\":0.0,\"eps\":0.0}')"
+      "Bash(curl -s -X POST http://127.0.0.1:5000/api/predict -H 'Content-Type: application/json' -d '{\"shape\":\"__TRACKED_VAR__\",\"re\":200,\"dy\":0.0,\"eps\":0.0}')",
+      "Bash(pip --version)",
+      "Bash(conda --version)",
+      "Bash(conda list *)",
+      "Bash(conda info *)",
+      "Bash(conda env *)"
     ]
   }
 }

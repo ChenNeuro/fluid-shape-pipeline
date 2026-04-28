@@ -6,7 +6,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 This is a fluid mechanics research repository that classifies 2D obstacle shapes using wake-field images. The core approach: in a 2D channel flow, can we identify the upstream obstacle shape (circle/triangle/airfoil/diamond/bar) from its wake pattern?
 
-The **wake-field branch** (`wake_field`) is the relevant pipeline for image-based wake classification at multiple scales (full/half/quarter/hotspot).
+The **wake-field branch** (`wake_field`) is the relevant pipeline for image-based wake classification using distance-based wake crops.
 
 ## Common Commands
 
@@ -38,11 +38,9 @@ The wake-field pipeline operates on velocity field distributions extracted from 
 
 2. **Wake Field Extraction** (`extract/build_wake_fields.py`): Converts raw probe data into multi-scale velocity field crops stored in `wake_fields/`.
 
-3. **Multi-Scale Model** (`vision/wake_model.py`): `MultiScaleWakeNet` using ResNet18 encoder with 4 variants:
-   - `full_only_4ch`: Full-scale only, 4 channels (ux, uy, speed, vorticity)
-   - `full_half_quarter_4ch`: 3 scales combined
-   - `full_half_quarter_hotspot_4ch`: 4 scales (adds "hotspot" crop)
-   - `full_half_quarter_hotspot_speed`: 4 scales, speed-only channel
+3. **Multi-Scale Model** (`vision/wake_model.py`): `MultiScaleWakeNet` using ResNet18 encoder with 2 active variants:
+   - `dist_single_4ch`: Single downstream crop, 4 channels (ux, uy, speed, vorticity)
+   - `dist_multi_4ch`: Multiple downstream crops combined, 4 channels
 
 4. **Training** (`ml/train_wake.py`): Multi-task learning predicting shape, position (dy), perturbation (eps), and Reynolds number.
 
@@ -59,7 +57,7 @@ The wake-field pipeline operates on velocity field distributions extracted from 
 - Raw data: `data/raw/<case_id>/probes.csv`, `data/raw/<case_id>/metadata.json`
 - Wake fields: `data/wake_fields/` with per-case `.npz` files containing multi-scale crops
 - Features: `data/features/features.csv`
-- Models: `models/sota.pkl`, `models/wake_field_main.pt`
+- Models: `models/sota.pkl`, `models/wake_field_main.pt`, `models/wake_field_single.pt`
 
 ## Config Files
 
@@ -69,7 +67,7 @@ The wake-field pipeline operates on velocity field distributions extracted from 
 
 ## Your Research Direction
 
-Based on your description (classifying shapes from wake images at different scales: full, half, quarter, specific small area), the `wake_field` pipeline already implements exactly this multi-scale approach. The key files to understand/modify are:
+Based on your description (classifying shapes from wake images at different downstream distances), the `wake_field` pipeline already implements that distance-based approach. The key files to understand/modify are:
 
 - `vision/wake_dataset.py`: How different scales/crops are defined and loaded
 - `ml/wake_common.py`: `VARIANTS` dict defines scale combinations

@@ -7,3 +7,5 @@ pyyaml
 opencv-python-headless
 torch
 torchvision
+timm
+pytest

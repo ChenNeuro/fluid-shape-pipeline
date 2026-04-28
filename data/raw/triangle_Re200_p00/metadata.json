@@ -3,15 +3,15 @@
   "backend": "synthetic",
   "shape": "triangle",
   "Re": 200,
-  "dy": 0.046930212333138294,
-  "eps": -0.01369155413524117,
-  "seed": 595235224,
+  "dy": 0.01891083491930768,
+  "eps": 0.03509372616595885,
+  "seed": 46584443,
   "geometry": {
     "H": 1.0,
     "d": 0.2,
     "x0": 3.0,
     "y0_nominal": 0.5,
-    "y0_actual": 0.5469302123331383,
+    "y0_actual": 0.5189108349193077,
     "L_in": 5.0,
     "L_out": 5.0,
     "L_total": 10.0
@@ -59,15 +59,15 @@
   },
   "sampling": {
     "dt": 0.01,
-    "n_samples": 2000,
+    "n_samples": 1283,
     "t_start": 0.0,
-    "t_end": 19.990000000000002,
+    "t_end": 12.82,
     "transient_steps": 800,
-    "f0_est": 1.5994230852539406
+    "f0_est": 1.5600601584919964
   },
   "synthetic_profile": {
     "challenge_enabled": true,
-    "noise_std": 0.05399999999999999
+    "noise_std": 0.0336
   },
   "files": {
     "probes_csv": "probes.csv",
@@ -75,19 +75,19 @@
     "wake_field_npz": "wake_field.npz"
   },
   "steady_frame_range": {
-    "sample_index_start": 1964,
-    "sample_index_end": 1999,
-    "t_start": 19.639999389648438,
-    "t_end": 19.989999771118164,
+    "sample_index_start": 1247,
+    "sample_index_end": 1282,
+    "t_start": 12.470000267028809,
+    "t_end": 12.819999694824219,
     "n_frames": 8
   },
   "wake_roi": {
     "x_min": 3.1,
     "x_max": 10.0,
-    "y_min": -0.030000000000000027,
-    "y_max": 1.03,
+    "y_min": -0.020000000000000018,
+    "y_max": 1.02,
     "width": 6.9,
-    "height": 1.06,
+    "height": 1.04,
     "pixels_x": 128,
     "pixels_y": 128
   },
@@ -99,19 +99,19 @@
   ],
   "crop_boxes": {
     "dist0.5_full": [
-      0.07681159420289851,
+      0.07246376811594203,
       0.0,
       1.0,
       1.0
     ],
     "dist1.0_full": [
-      0.1536231884057971,
+      0.14492753623188398,
       0.0,
       1.0,
       1.0
     ],
     "dist2.0_full": [
-      0.3072463768115943,
+      0.289855072463768,
       0.0,
       1.0,
       1.0
@@ -120,7 +120,7 @@
   "field_canvas": {
     "x_start": 3.1,
     "x_end": 10.0,
-    "y_min": -0.030000000000000027,
-    "y_max": 1.03
+    "y_min": -0.020000000000000018,
+    "y_max": 1.02
   }
 }

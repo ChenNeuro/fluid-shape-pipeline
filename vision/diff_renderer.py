@@ -8,8 +8,9 @@ import torch.nn as nn
 
 class DifferentiableShapeRenderer(nn.Module):
     """
-    SDF-based differentiable renderer producing soft obstacle probability maps.
-    Uses a clipped-linear transition zone to produce masks that reach [0,1] fully.
+    SDF-based differentiable renderer producing soft full-geometry occupancy maps.
+    The rendered mask is 1.0 in non-fluid regions: the obstacle body plus the
+    channel region excluded by lens deformation controlled by ``eps``.
 
     Shape order: 0=circle, 1=triangle, 2=airfoil, 3=diamond, 4=bar
     """
@@ -48,12 +49,15 @@ class DifferentiableShapeRenderer(nn.Module):
         grid_x, grid_y = torch.meshgrid(x_phys, y_phys, indexing="xy")
         return grid_x, grid_y
 
-    def _edge_sdf(self, px: torch.Tensor, py: torch.Tensor, ax: float, ay: float, bx: float, by: float) -> torch.Tensor:
-        import math
-        abx = bx - ax
-        aby = by - ay
-        len_ab = math.sqrt(abx ** 2 + aby ** 2)
-        cross_num = (px - ax) * aby - (py - ay) * abx
+    def _edge_sdf(self, px: torch.Tensor, py: torch.Tensor, ax, ay, bx, by) -> torch.Tensor:
+        ax_t = torch.as_tensor(ax, dtype=px.dtype, device=px.device)
+        ay_t = torch.as_tensor(ay, dtype=py.dtype, device=py.device)
+        bx_t = torch.as_tensor(bx, dtype=px.dtype, device=px.device)
+        by_t = torch.as_tensor(by, dtype=py.dtype, device=py.device)
+        abx = bx_t - ax_t
+        aby = by_t - ay_t
+        len_ab = torch.sqrt(abx**2 + aby**2 + 1e-12)
+        cross_num = (px - ax_t) * aby - (py - ay_t) * abx
         return cross_num / (len_ab + 1e-12)
 
     def _shape_sdf(self, px: torch.Tensor, py: torch.Tensor, shape_idx: int, cy: torch.Tensor) -> torch.Tensor:
@@ -71,9 +75,9 @@ class DifferentiableShapeRenderer(nn.Module):
             v3x = self.x0 + self.d / 2.0
             v3y = cy - h_tri / 3.0
 
-            d1 = self._edge_sdf(px, py, v1x, float(v1y.item()), v2x, float(v2y.item()))
-            d2 = self._edge_sdf(px, py, v2x, float(v2y.item()), v3x, float(v3y.item()))
-            d3 = self._edge_sdf(px, py, v3x, float(v3y.item()), v1x, float(v1y.item()))
+            d1 = self._edge_sdf(px, py, v1x, v1y, v2x, v2y)
+            d2 = self._edge_sdf(px, py, v2x, v2y, v3x, v3y)
+            d3 = self._edge_sdf(px, py, v3x, v3y, v1x, v1y)
             return torch.max(torch.max(d1, d2), d3)
 
         elif shape_idx == 2:
@@ -105,6 +109,15 @@ class DifferentiableShapeRenderer(nn.Module):
         else:
             raise ValueError(f"Unknown shape index: {shape_idx}")
 
+    def _channel_wall_sdf(self, px: torch.Tensor, py: torch.Tensor, eps: torch.Tensor) -> torch.Tensor:
+        x_transition = self.l_total - self.h
+        frac = torch.clamp((px - x_transition) / self.h, 0.0, 1.0)
+        h_local = self.h * (1.0 + eps * frac)
+        y_center = 0.5 * self.h
+        y_bottom = y_center - 0.5 * h_local
+        y_top = y_center + 0.5 * h_local
+        return torch.minimum(py - y_bottom, y_top - py)
+
     def _sdf_to_mask(self, sdf: torch.Tensor) -> torch.Tensor:
         # Clipped-linear mask: full inside (sdf<0), full outside (sdf>tw),
         # linear transition in between. Guarantees mask in [0,1].
@@ -124,8 +137,11 @@ class DifferentiableShapeRenderer(nn.Module):
         B = shape_indices.shape[0]
         masks: list[torch.Tensor] = []
         for b in range(B):
-            sdf = self._shape_sdf(px, py, int(shape_indices[b].item()), cy_center[b])
-            masks.append(self._sdf_to_mask(sdf))
+            obstacle_sdf = self._shape_sdf(px, py, int(shape_indices[b].item()), cy_center[b])
+            obstacle_mask = self._sdf_to_mask(obstacle_sdf)
+            outside_channel_sdf = self._channel_wall_sdf(px, py, eps_values[b])
+            outside_channel_mask = self._sdf_to_mask(outside_channel_sdf)
+            masks.append(torch.maximum(obstacle_mask, outside_channel_mask))
 
         return torch.stack(masks, dim=0).unsqueeze(1)
 
@@ -154,7 +170,8 @@ class DifferentiableShapeRenderer(nn.Module):
         return loss, pred_mask, target_mask
 
     def eval_soft_metrics(self, pred_mask: torch.Tensor, target_mask: torch.Tensor) -> dict[str, float]:
-        # Binarize with 0.5 threshold so self-check = 1.0 and metrics are interpretable
+        # Binarize the full-geometry occupancy so self-check = 1.0 and metrics
+        # remain easy to interpret.
         pred_bin = (pred_mask > 0.5).float()
         target_bin = (target_mask > 0.5).float()
         intersection = (pred_bin * target_bin).sum()

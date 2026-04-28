@@ -1569,3 +1569,67 @@
 2026-04-23 11:11:29,871 | INFO | dataset | Case bar_Re300_p28 succeeded on attempt 1 in 1.01s
 2026-04-23 11:11:29,892 | INFO | dataset | Case bar_Re300_p29 succeeded on attempt 1 in 0.83s
 2026-04-23 11:11:30,690 | INFO | dataset | Dataset generation complete. success=450 failed=0 failure_rate=0.00%
+2026-04-23 20:59:33,449 | INFO | dataset | Starting dataset generation with solver=synthetic, workers=0, cases=30
+2026-04-23 20:59:33,721 | INFO | dataset | Case circle_Re100_p00 succeeded on attempt 1 in 0.27s
+2026-04-23 20:59:33,944 | INFO | dataset | Case circle_Re100_p01 succeeded on attempt 1 in 0.22s
+2026-04-23 20:59:34,168 | INFO | dataset | Case circle_Re200_p00 succeeded on attempt 1 in 0.22s
+2026-04-23 20:59:34,398 | INFO | dataset | Case circle_Re200_p01 succeeded on attempt 1 in 0.23s
+2026-04-23 20:59:34,617 | INFO | dataset | Case circle_Re300_p00 succeeded on attempt 1 in 0.22s
+2026-04-23 20:59:34,823 | INFO | dataset | Case circle_Re300_p01 succeeded on attempt 1 in 0.21s
+2026-04-23 20:59:34,978 | INFO | dataset | Case triangle_Re100_p00 succeeded on attempt 1 in 0.15s
+2026-04-23 20:59:35,128 | INFO | dataset | Case triangle_Re100_p01 succeeded on attempt 1 in 0.15s
+2026-04-23 20:59:35,283 | INFO | dataset | Case triangle_Re200_p00 succeeded on attempt 1 in 0.15s
+2026-04-23 20:59:35,448 | INFO | dataset | Case triangle_Re200_p01 succeeded on attempt 1 in 0.16s
+2026-04-23 20:59:35,598 | INFO | dataset | Case triangle_Re300_p00 succeeded on attempt 1 in 0.15s
+2026-04-23 20:59:35,737 | INFO | dataset | Case triangle_Re300_p01 succeeded on attempt 1 in 0.14s
+2026-04-23 20:59:36,066 | INFO | dataset | Case airfoil_Re100_p00 succeeded on attempt 1 in 0.33s
+2026-04-23 20:59:36,385 | INFO | dataset | Case airfoil_Re100_p01 succeeded on attempt 1 in 0.32s
+2026-04-23 20:59:36,674 | INFO | dataset | Case airfoil_Re200_p00 succeeded on attempt 1 in 0.29s
+2026-04-23 20:59:36,970 | INFO | dataset | Case airfoil_Re200_p01 succeeded on attempt 1 in 0.30s
+2026-04-23 20:59:37,272 | INFO | dataset | Case airfoil_Re300_p00 succeeded on attempt 1 in 0.30s
+2026-04-23 20:59:37,556 | INFO | dataset | Case airfoil_Re300_p01 succeeded on attempt 1 in 0.28s
+2026-04-23 20:59:37,739 | INFO | dataset | Case diamond_Re100_p00 succeeded on attempt 1 in 0.18s
+2026-04-23 20:59:37,932 | INFO | dataset | Case diamond_Re100_p01 succeeded on attempt 1 in 0.19s
+2026-04-23 20:59:38,113 | INFO | dataset | Case diamond_Re200_p00 succeeded on attempt 1 in 0.18s
+2026-04-23 20:59:38,288 | INFO | dataset | Case diamond_Re200_p01 succeeded on attempt 1 in 0.17s
+2026-04-23 20:59:38,455 | INFO | dataset | Case diamond_Re300_p00 succeeded on attempt 1 in 0.17s
+2026-04-23 20:59:38,632 | INFO | dataset | Case diamond_Re300_p01 succeeded on attempt 1 in 0.18s
+2026-04-23 20:59:39,047 | INFO | dataset | Case bar_Re100_p00 succeeded on attempt 1 in 0.42s
+2026-04-23 20:59:39,494 | INFO | dataset | Case bar_Re100_p01 succeeded on attempt 1 in 0.45s
+2026-04-23 20:59:39,905 | INFO | dataset | Case bar_Re200_p00 succeeded on attempt 1 in 0.41s
+2026-04-23 20:59:40,291 | INFO | dataset | Case bar_Re200_p01 succeeded on attempt 1 in 0.39s
+2026-04-23 20:59:40,666 | INFO | dataset | Case bar_Re300_p00 succeeded on attempt 1 in 0.37s
+2026-04-23 20:59:41,067 | INFO | dataset | Case bar_Re300_p01 succeeded on attempt 1 in 0.40s
+2026-04-23 20:59:41,178 | INFO | dataset | Dataset generation complete. success=30 failed=0 failure_rate=0.00%
+2026-04-23 23:49:37,916 | INFO | dataset | Starting dataset generation with solver=synthetic, workers=0, cases=30
+2026-04-23 23:49:38,181 | INFO | dataset | Case circle_Re100_p00 succeeded on attempt 1 in 0.26s
+2026-04-23 23:49:38,390 | INFO | dataset | Case circle_Re100_p01 succeeded on attempt 1 in 0.21s
+2026-04-23 23:49:38,582 | INFO | dataset | Case circle_Re200_p00 succeeded on attempt 1 in 0.19s
+2026-04-23 23:49:38,779 | INFO | dataset | Case circle_Re200_p01 succeeded on attempt 1 in 0.20s
+2026-04-23 23:49:38,971 | INFO | dataset | Case circle_Re300_p00 succeeded on attempt 1 in 0.19s
+2026-04-23 23:49:39,161 | INFO | dataset | Case circle_Re300_p01 succeeded on attempt 1 in 0.19s
+2026-04-23 23:49:39,298 | INFO | dataset | Case triangle_Re100_p00 succeeded on attempt 1 in 0.14s
+2026-04-23 23:49:39,442 | INFO | dataset | Case triangle_Re100_p01 succeeded on attempt 1 in 0.14s
+2026-04-23 23:49:39,574 | INFO | dataset | Case triangle_Re200_p00 succeeded on attempt 1 in 0.13s
+2026-04-23 23:49:39,712 | INFO | dataset | Case triangle_Re200_p01 succeeded on attempt 1 in 0.14s
+2026-04-23 23:49:39,835 | INFO | dataset | Case triangle_Re300_p00 succeeded on attempt 1 in 0.12s
+2026-04-23 23:49:39,968 | INFO | dataset | Case triangle_Re300_p01 succeeded on attempt 1 in 0.13s
+2026-04-23 23:49:40,241 | INFO | dataset | Case airfoil_Re100_p00 succeeded on attempt 1 in 0.27s
+2026-04-23 23:49:40,504 | INFO | dataset | Case airfoil_Re100_p01 succeeded on attempt 1 in 0.26s
+2026-04-23 23:49:40,736 | INFO | dataset | Case airfoil_Re200_p00 succeeded on attempt 1 in 0.23s
+2026-04-23 23:49:41,006 | INFO | dataset | Case airfoil_Re200_p01 succeeded on attempt 1 in 0.27s
+2026-04-23 23:49:41,284 | INFO | dataset | Case airfoil_Re300_p00 succeeded on attempt 1 in 0.28s
+2026-04-23 23:49:41,575 | INFO | dataset | Case airfoil_Re300_p01 succeeded on attempt 1 in 0.29s
+2026-04-23 23:49:41,751 | INFO | dataset | Case diamond_Re100_p00 succeeded on attempt 1 in 0.18s
+2026-04-23 23:49:41,915 | INFO | dataset | Case diamond_Re100_p01 succeeded on attempt 1 in 0.16s
+2026-04-23 23:49:42,069 | INFO | dataset | Case diamond_Re200_p00 succeeded on attempt 1 in 0.15s
+2026-04-23 23:49:42,228 | INFO | dataset | Case diamond_Re200_p01 succeeded on attempt 1 in 0.16s
+2026-04-23 23:49:42,383 | INFO | dataset | Case diamond_Re300_p00 succeeded on attempt 1 in 0.15s
+2026-04-23 23:49:42,565 | INFO | dataset | Case diamond_Re300_p01 succeeded on attempt 1 in 0.18s
+2026-04-23 23:49:42,964 | INFO | dataset | Case bar_Re100_p00 succeeded on attempt 1 in 0.40s
+2026-04-23 23:49:43,370 | INFO | dataset | Case bar_Re100_p01 succeeded on attempt 1 in 0.41s
+2026-04-23 23:49:43,738 | INFO | dataset | Case bar_Re200_p00 succeeded on attempt 1 in 0.37s
+2026-04-23 23:49:44,099 | INFO | dataset | Case bar_Re200_p01 succeeded on attempt 1 in 0.36s
+2026-04-23 23:49:44,445 | INFO | dataset | Case bar_Re300_p00 succeeded on attempt 1 in 0.35s
+2026-04-23 23:49:44,817 | INFO | dataset | Case bar_Re300_p01 succeeded on attempt 1 in 0.37s
+2026-04-23 23:49:44,911 | INFO | dataset | Dataset generation complete. success=30 failed=0 failure_rate=0.00%

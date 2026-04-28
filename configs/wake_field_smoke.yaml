@@ -108,9 +108,9 @@ vision:
   flow_estimator: farneback
   scales: [dist0.5_full, dist1.0_full, dist2.0_full]
   training:
-    epochs: 1
-    batch_size: 8
-    lr: 0.001
+    epochs: 20
+    batch_size: 16
+    lr: 0.002
     weight_decay: 0.0001
     fusion_hidden: 128
     dropout: 0.10

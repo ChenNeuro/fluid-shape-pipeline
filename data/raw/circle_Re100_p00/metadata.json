@@ -3,15 +3,15 @@
   "backend": "synthetic",
   "shape": "circle",
   "Re": 100,
-  "dy": 0.03389621760123614,
-  "eps": -0.021333480543048643,
-  "seed": 1187289378,
+  "dy": 0.013689894561171118,
+  "eps": 0.007317969069416921,
+  "seed": 1191620021,
   "geometry": {
     "H": 1.0,
     "d": 0.2,
     "x0": 3.0,
     "y0_nominal": 0.5,
-    "y0_actual": 0.5338962176012362,
+    "y0_actual": 0.5136898945611711,
     "L_in": 5.0,
     "L_out": 5.0,
     "L_total": 10.0
@@ -59,15 +59,15 @@
   },
   "sampling": {
     "dt": 0.01,
-    "n_samples": 2320,
+    "n_samples": 2556,
     "t_start": 0.0,
-    "t_end": 23.189999999999998,
-    "transient_steps": 928,
-    "f0_est": 0.8624021415909133
+    "t_end": 25.55,
+    "transient_steps": 1023,
+    "f0_est": 0.7826723628946431
   },
   "synthetic_profile": {
     "challenge_enabled": true,
-    "noise_std": 0.05399999999999999
+    "noise_std": 0.0336
   },
   "files": {
     "probes_csv": "probes.csv",
@@ -75,19 +75,19 @@
     "wake_field_npz": "wake_field.npz"
   },
   "steady_frame_range": {
-    "sample_index_start": 2284,
-    "sample_index_end": 2319,
-    "t_start": 22.84000015258789,
-    "t_end": 23.190000534057617,
+    "sample_index_start": 2520,
+    "sample_index_end": 2555,
+    "t_start": 25.200000762939453,
+    "t_end": 25.549999237060547,
     "n_frames": 8
   },
   "wake_roi": {
     "x_min": 3.1,
     "x_max": 10.0,
-    "y_min": -0.030000000000000027,
-    "y_max": 1.03,
+    "y_min": -0.020000000000000018,
+    "y_max": 1.02,
     "width": 6.9,
-    "height": 1.06,
+    "height": 1.04,
     "pixels_x": 128,
     "pixels_y": 128
   },
@@ -99,19 +99,19 @@
   ],
   "crop_boxes": {
     "dist0.5_full": [
-      0.07681159420289851,
+      0.07246376811594203,
       0.0,
       1.0,
       1.0
     ],
     "dist1.0_full": [
-      0.1536231884057971,
+      0.14492753623188398,
       0.0,
       1.0,
       1.0
     ],
     "dist2.0_full": [
-      0.3072463768115943,
+      0.289855072463768,
       0.0,
       1.0,
       1.0
@@ -120,7 +120,7 @@
   "field_canvas": {
     "x_start": 3.1,
     "x_end": 10.0,
-    "y_min": -0.030000000000000027,
-    "y_max": 1.03
+    "y_min": -0.020000000000000018,
+    "y_max": 1.02
   }
 }
