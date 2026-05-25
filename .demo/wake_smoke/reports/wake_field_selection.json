@@ -1,9 +1,0 @@
-{
-  "main_variant": "full_half_quarter_hotspot_4ch",
-  "speed_variant": "full_half_quarter_hotspot_speed",
-  "device": "mps",
-  "repeat_seeds": [
-    42
-  ],
-  "test_size": 15
-}

@@ -1,9 +1,0 @@
-{
-  "solver": "synthetic",
-  "total_cases": 30,
-  "success_cases": 30,
-  "failed_cases": 0,
-  "failure_rate": 0.0,
-  "manifest": "/mnt/c/Users/chenyihao/Documents/GitHub/fluid-shape-pipeline/data/raw/manifest.csv",
-  "index": "/mnt/c/Users/chenyihao/Documents/GitHub/fluid-shape-pipeline/data/raw/index.csv"
-}

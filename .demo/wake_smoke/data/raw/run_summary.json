@@ -1,9 +1,0 @@
-{
-  "solver": "synthetic",
-  "total_cases": 30,
-  "success_cases": 30,
-  "failed_cases": 0,
-  "failure_rate": 0.0,
-  "manifest": "/Users/chenyihao/mycode/\u6d41\u4f53\u529b\u5b66\u5b9e\u9a8c/fluid-shape-pipeline/.demo/wake_smoke/data/raw/manifest.csv",
-  "index": "/Users/chenyihao/mycode/\u6d41\u4f53\u529b\u5b66\u5b9e\u9a8c/fluid-shape-pipeline/.demo/wake_smoke/data/raw/index.csv"
-}

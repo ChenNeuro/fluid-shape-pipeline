@@ -1,9 +1,0 @@
-{
-  "main_variant": "dist_multi_4ch",
-  "speed_variant": null,
-  "device": "cuda",
-  "repeat_seeds": [
-    42
-  ],
-  "test_size": 15
-}
