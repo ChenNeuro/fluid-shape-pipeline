@@ -21,7 +21,14 @@ def _triangle_mask(px: np.ndarray, py: np.ndarray, cx: float, cy: float, side: f
     return ~(has_neg & has_pos)
 
 
-def _airfoil_mask(px: np.ndarray, py: np.ndarray, cx: float, cy: float, chord: float, thickness_ratio: float = 0.12) -> np.ndarray:
+def _airfoil_mask(
+    px: np.ndarray,
+    py: np.ndarray,
+    cx: float,
+    cy: float,
+    chord: float,
+    thickness_ratio: float = 0.12,
+) -> np.ndarray:
     """
     Symmetric NACA-like 4-digit airfoil mask (e.g. NACA 00xx), chord-aligned with +x.
     """
@@ -29,22 +36,30 @@ def _airfoil_mask(px: np.ndarray, py: np.ndarray, cx: float, cy: float, chord: f
     inside_x = (xr >= 0.0) & (xr <= 1.0)
 
     x_clamped = np.clip(xr, 0.0, 1.0)
-    yt_over_c = 5.0 * thickness_ratio * (
-        0.2969 * np.sqrt(x_clamped + 1e-12)
-        - 0.1260 * x_clamped
-        - 0.3516 * x_clamped**2
-        + 0.2843 * x_clamped**3
-        - 0.1015 * x_clamped**4
+    yt_over_c = (
+        5.0
+        * thickness_ratio
+        * (
+            0.2969 * np.sqrt(x_clamped + 1e-12)
+            - 0.1260 * x_clamped
+            - 0.3516 * x_clamped**2
+            + 0.2843 * x_clamped**3
+            - 0.1015 * x_clamped**4
+        )
     )
     half_thickness = chord * yt_over_c
     return inside_x & (np.abs(py - cy) <= half_thickness)
 
 
-def _diamond_mask(px: np.ndarray, py: np.ndarray, cx: float, cy: float, half_dx: float, half_dy: float) -> np.ndarray:
+def _diamond_mask(
+    px: np.ndarray, py: np.ndarray, cx: float, cy: float, half_dx: float, half_dy: float
+) -> np.ndarray:
     return (np.abs(px - cx) / (half_dx + 1e-12) + np.abs(py - cy) / (half_dy + 1e-12)) <= 1.0
 
 
-def obstacle_mask(px: np.ndarray, py: np.ndarray, shape: str, cx: float, cy: float, d: float) -> np.ndarray:
+def obstacle_mask(
+    px: np.ndarray, py: np.ndarray, shape: str, cx: float, cy: float, d: float
+) -> np.ndarray:
     if shape == "circle":
         r = 0.5 * d
         return (px - cx) ** 2 + (py - cy) ** 2 <= r**2

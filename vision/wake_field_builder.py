@@ -7,7 +7,6 @@ import numpy as np
 
 from sim.data_schema import WAKE_FIELD_FILENAME, find_wake_frames_npz, read_metadata, write_metadata
 
-
 SUPPORTED_CHANNELS = ("ux", "uy", "speed", "vorticity")
 
 
@@ -84,7 +83,7 @@ def parse_distance_scale(name: str) -> tuple[float, str] | None:
     prefix = "dist"
     if not name.startswith(prefix):
         return None
-    rest = name[len(prefix):]
+    rest = name[len(prefix) :]
     parts = rest.rsplit("_", 1)
     if len(parts) != 2:
         return None
@@ -204,7 +203,9 @@ def build_case_wake_field(case_dir: Path, cfg: dict) -> dict:
     estimator = str(vision_cfg.get("flow_estimator", "farneback"))
     field_size = int(vision_cfg.get("field_size", 128))
     channel_names = [str(name) for name in vision_cfg.get("channels", SUPPORTED_CHANNELS)]
-    scales = [str(name) for name in vision_cfg.get("scales", ["full", "half", "quarter", "hotspot"])]
+    scales = [
+        str(name) for name in vision_cfg.get("scales", ["full", "half", "quarter", "hotspot"])
+    ]
 
     for channel_name in channel_names:
         if channel_name not in SUPPORTED_CHANNELS:
@@ -233,7 +234,10 @@ def build_case_wake_field(case_dir: Path, cfg: dict) -> dict:
         canvas_y_min=canvas_y_min,
         canvas_y_max=canvas_y_max,
     )
-    crops = np.stack([resize_crop(field_norm, crop_boxes[scale], output_size=field_size) for scale in scales], axis=0)
+    crops = np.stack(
+        [resize_crop(field_norm, crop_boxes[scale], output_size=field_size) for scale in scales],
+        axis=0,
+    )
 
     wake_field_path = case_dir / WAKE_FIELD_FILENAME
     np.savez_compressed(

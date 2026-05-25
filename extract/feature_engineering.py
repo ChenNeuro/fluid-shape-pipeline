@@ -89,7 +89,9 @@ def _pod_features(signal_matrix: np.ndarray, k_modes: int) -> dict[str, float]:
     return result
 
 
-def extract_features_from_df(df: pd.DataFrame, n_bands: int, pod_modes: int, add_pod: bool = True) -> dict[str, float]:
+def extract_features_from_df(
+    df: pd.DataFrame, n_bands: int, pod_modes: int, add_pod: bool = True
+) -> dict[str, float]:
     time = df["time"].to_numpy(dtype=float)
     probe_cols = [col for col in df.columns if col.startswith("u_")]
     signal_matrix = df[probe_cols].to_numpy(dtype=float)

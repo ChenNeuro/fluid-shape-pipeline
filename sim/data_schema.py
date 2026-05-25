@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-
 PROBES_FILENAME = "probes.csv"
 LEGACY_PROBES_FILENAME = "probe_u.csv"
 METADATA_FILENAME = "metadata.json"
@@ -21,7 +20,9 @@ def find_probes_csv(case_dir: Path) -> Path:
     if legacy.exists():
         return legacy
 
-    raise FileNotFoundError(f"No probe csv found in {case_dir}. Expected {PROBES_FILENAME} or {LEGACY_PROBES_FILENAME}.")
+    raise FileNotFoundError(
+        f"No probe csv found in {case_dir}. Expected {PROBES_FILENAME} or {LEGACY_PROBES_FILENAME}."
+    )
 
 
 def find_metadata_json(case_dir: Path) -> Path:
@@ -33,7 +34,9 @@ def find_metadata_json(case_dir: Path) -> Path:
     if legacy.exists():
         return legacy
 
-    raise FileNotFoundError(f"No metadata file found in {case_dir}. Expected {METADATA_FILENAME} or {LEGACY_METADATA_FILENAME}.")
+    raise FileNotFoundError(
+        f"No metadata file found in {case_dir}. Expected {METADATA_FILENAME} or {LEGACY_METADATA_FILENAME}."
+    )
 
 
 def write_metadata(case_dir: Path, payload: dict) -> Path:
@@ -52,11 +55,15 @@ def find_wake_frames_npz(case_dir: Path) -> Path:
     path = case_dir / WAKE_FRAMES_FILENAME
     if path.exists():
         return path
-    raise FileNotFoundError(f"No wake frame artifact found in {case_dir}. Expected {WAKE_FRAMES_FILENAME}.")
+    raise FileNotFoundError(
+        f"No wake frame artifact found in {case_dir}. Expected {WAKE_FRAMES_FILENAME}."
+    )
 
 
 def find_wake_field_npz(case_dir: Path) -> Path:
     path = case_dir / WAKE_FIELD_FILENAME
     if path.exists():
         return path
-    raise FileNotFoundError(f"No wake field artifact found in {case_dir}. Expected {WAKE_FIELD_FILENAME}.")
+    raise FileNotFoundError(
+        f"No wake field artifact found in {case_dir}. Expected {WAKE_FIELD_FILENAME}."
+    )

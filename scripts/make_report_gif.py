@@ -5,7 +5,6 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-
 DEFAULT_FRAMES = [
     ("separability_pca.png", "Feature Separability (PCA)"),
     ("spectra_examples.png", "Representative Spectra"),
@@ -21,11 +20,15 @@ DEFAULT_FRAMES = [
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build an animated GIF from report PNGs")
-    parser.add_argument("--reports-dir", default="reports", help="Directory containing report images")
+    parser.add_argument(
+        "--reports-dir", default="reports", help="Directory containing report images"
+    )
     parser.add_argument("--output", default="reports/pipeline_overview.gif", help="Output GIF path")
     parser.add_argument("--width", type=int, default=1000, help="GIF frame width")
     parser.add_argument("--height", type=int, default=620, help="GIF frame height")
-    parser.add_argument("--duration-ms", type=int, default=1300, help="Frame duration in milliseconds")
+    parser.add_argument(
+        "--duration-ms", type=int, default=1300, help="Frame duration in milliseconds"
+    )
     return parser.parse_args()
 
 
@@ -37,7 +40,9 @@ def make_frame(image_path: Path, caption: str, size: tuple[int, int]) -> Image.I
     inner_margin = 20
 
     image = Image.open(image_path).convert("RGB")
-    fitted = ImageOps.contain(image, (width - 2 * inner_margin, height - title_h - 2 * inner_margin))
+    fitted = ImageOps.contain(
+        image, (width - 2 * inner_margin, height - title_h - 2 * inner_margin)
+    )
 
     x0 = (width - fitted.width) // 2
     y0 = title_h + (height - title_h - fitted.height) // 2
@@ -64,7 +69,9 @@ def main() -> None:
         image_path = reports_dir / file_name
         if not image_path.exists():
             continue
-        frames.append(make_frame(image_path=image_path, caption=caption, size=(args.width, args.height)))
+        frames.append(
+            make_frame(image_path=image_path, caption=caption, size=(args.width, args.height))
+        )
         used.append(file_name)
 
     if not frames:

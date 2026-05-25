@@ -18,7 +18,6 @@ from sim.config import load_config, repo_root
 from sim.data_schema import find_probes_csv
 from sim.logging_utils import setup_logger
 
-
 META_COLS = ["case_id", "shape", "Re", "dy", "eps", "seed"]
 
 
@@ -194,7 +193,9 @@ def _plot_spectra_examples(features_df: pd.DataFrame, raw_root: Path, output_pat
     plt.close(fig)
 
 
-def _plot_confusion(y_true: np.ndarray, y_pred: np.ndarray, labels: list[str], output_path: Path) -> None:
+def _plot_confusion(
+    y_true: np.ndarray, y_pred: np.ndarray, labels: list[str], output_path: Path
+) -> None:
     cm = confusion_matrix(y_true, y_pred, labels=labels)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
     fig, ax = plt.subplots(figsize=(6, 5))
@@ -205,7 +206,9 @@ def _plot_confusion(y_true: np.ndarray, y_pred: np.ndarray, labels: list[str], o
     plt.close(fig)
 
 
-def _robustness_curve(x: np.ndarray, y: np.ndarray, eps: np.ndarray, model_cfg: dict, output_path: Path) -> list[dict[str, float]]:
+def _robustness_curve(
+    x: np.ndarray, y: np.ndarray, eps: np.ndarray, model_cfg: dict, output_path: Path
+) -> list[dict[str, float]]:
     folds = int(model_cfg.get("cv_folds", 5))
     seed = int(model_cfg.get("random_state", 42))
 
@@ -258,7 +261,12 @@ def _robustness_curve(x: np.ndarray, y: np.ndarray, eps: np.ndarray, model_cfg: 
     ax1.grid(alpha=0.25)
 
     ax2 = ax1.twinx()
-    ax2.bar(centers, counts, width=(centers[1] - centers[0]) * 0.6 if len(centers) > 1 else 0.001, alpha=0.2)
+    ax2.bar(
+        centers,
+        counts,
+        width=(centers[1] - centers[0]) * 0.6 if len(centers) > 1 else 0.001,
+        alpha=0.2,
+    )
     ax2.set_ylabel("Samples per bin")
 
     plt.title("Robustness Sweep: Geometry Perturbation vs Accuracy")
@@ -269,7 +277,9 @@ def _robustness_curve(x: np.ndarray, y: np.ndarray, eps: np.ndarray, model_cfg: 
     return rows
 
 
-def _leave_one_re_out(features_df: pd.DataFrame, feature_cols: list[str], model_cfg: dict) -> list[dict[str, float]]:
+def _leave_one_re_out(
+    features_df: pd.DataFrame, feature_cols: list[str], model_cfg: dict
+) -> list[dict[str, float]]:
     results = []
     seed = int(model_cfg.get("random_state", 42))
 
@@ -332,15 +342,21 @@ def _write_summary(
     lines.append("# Obstacle Shape Identification Summary")
     lines.append("")
     lines.append("## Experiment Setup")
-    lines.append(f"- Solver mode: `{cfg['project'].get('solver', 'synthetic')}` (this run used synthetic baseline)")
+    lines.append(
+        f"- Solver mode: `{cfg['project'].get('solver', 'synthetic')}` (this run used synthetic baseline)"
+    )
     lines.append(
         f"- Shapes: {', '.join(sim_cfg['shapes'])}; Re set: {sim_cfg['re_values']}; perturbations per (shape, Re): {sim_cfg['perturbations_per_combo']}"
     )
     lines.append(
         f"- Probes: N={sim_cfg['probes_n']} at outlet x=L; geometry perturbation: dy in [{sim_cfg['perturb']['dy_min']}, {sim_cfg['perturb']['dy_max']}] * H, eps in [0, {sim_cfg['perturb']['eps_max']}]"
     )
-    lines.append(f"- Data rows in `features.csv`: {features_df.shape[0]}, feature dimensions: {features_df.shape[1] - len(META_COLS)}")
-    lines.append(f"- Case execution: total={total_cases}, success={success_cases}, failed={failed_cases}, failure rate={failure_rate:.2f}%")
+    lines.append(
+        f"- Data rows in `features.csv`: {features_df.shape[0]}, feature dimensions: {features_df.shape[1] - len(META_COLS)}"
+    )
+    lines.append(
+        f"- Case execution: total={total_cases}, success={success_cases}, failed={failed_cases}, failure rate={failure_rate:.2f}%"
+    )
     lines.append("")
 
     lines.append("## Baseline Split Metrics (Stratified Holdout)")
@@ -392,15 +408,23 @@ def _write_summary(
     lines.append("")
 
     lines.append("## Key Conclusions")
-    lines.append("- Outlet probe velocity signatures are separable across obstacle shapes with the current feature set.")
+    lines.append(
+        "- Outlet probe velocity signatures are separable across obstacle shapes with the current feature set."
+    )
     lines.append(f"- {feature_note}")
     lines.append(f"- {robustness_note}")
     lines.append("")
 
     lines.append("## Next Steps")
-    lines.append("- Replace synthetic generator with OpenFOAM runs for physics-grounded validation while keeping raw CSV schema unchanged.")
-    lines.append("- Add more challenging perturbations (x-shift, obstacle rotation, inlet profile changes) and domain randomization.")
-    lines.append("- Benchmark temporal models (1D CNN / transformer) directly on probe sequences against feature-based baseline.")
+    lines.append(
+        "- Replace synthetic generator with OpenFOAM runs for physics-grounded validation while keeping raw CSV schema unchanged."
+    )
+    lines.append(
+        "- Add more challenging perturbations (x-shift, obstacle rotation, inlet profile changes) and domain randomization."
+    )
+    lines.append(
+        "- Benchmark temporal models (1D CNN / transformer) directly on probe sequences against feature-based baseline."
+    )
 
     output_md.write_text("\n".join(lines), encoding="utf-8")
 
@@ -431,7 +455,9 @@ def main() -> None:
     repeat_seeds = [int(v) for v in ml_cfg.get("repeat_seeds", [random_state])]
     repeat_seeds = sorted(set(repeat_seeds))
 
-    test_n = _compute_stratified_test_n(n_total=n_total, n_strata=n_strata, requested_ratio=requested_ratio)
+    test_n = _compute_stratified_test_n(
+        n_total=n_total, n_strata=n_strata, requested_ratio=requested_ratio
+    )
 
     x_train, x_test, y_train, y_test = train_test_split(
         x,
@@ -505,7 +531,9 @@ def main() -> None:
     top_feature_names = [name for name, _ in top_importance]
     n_freq = sum(("f_peak" in name) or ("band_" in name) for name in top_feature_names)
     if n_freq >= max(3, len(top_feature_names) // 2):
-        feature_note = "Frequency-domain descriptors are the dominant contributors among top-ranked features."
+        feature_note = (
+            "Frequency-domain descriptors are the dominant contributors among top-ranked features."
+        )
     else:
         feature_note = "Top contributors are mixed across frequency, statistics, and cross-probe structure features."
 
@@ -522,9 +550,13 @@ def main() -> None:
         elif delta_end >= 0.05:
             robustness_note = "Accuracy increases slightly toward higher perturbation bins for this synthetic dataset."
         else:
-            robustness_note = "Accuracy remains broadly stable across the tested outlet lens perturbation range."
+            robustness_note = (
+                "Accuracy remains broadly stable across the tested outlet lens perturbation range."
+            )
     else:
-        robustness_note = "Robustness trend is inconclusive because available perturbation bins are limited."
+        robustness_note = (
+            "Robustness trend is inconclusive because available perturbation bins are limited."
+        )
 
     manifest_df = pd.read_csv(root / "data" / "raw" / "manifest.csv")
     _write_summary(

@@ -19,7 +19,6 @@ from sklearn.svm import SVC
 from sim.config import load_config, repo_root
 from sim.logging_utils import setup_logger
 
-
 META_COLS = ["case_id", "shape", "Re", "dy", "eps", "seed"]
 
 
@@ -129,7 +128,9 @@ def _evaluate_repeats(
     return rows, summary
 
 
-def _plot_confusion(y_true: np.ndarray, y_pred: np.ndarray, labels: list[str], output_path: Path, title: str) -> None:
+def _plot_confusion(
+    y_true: np.ndarray, y_pred: np.ndarray, labels: list[str], output_path: Path, title: str
+) -> None:
     cm = confusion_matrix(y_true, y_pred, labels=labels)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
     fig, ax = plt.subplots(figsize=(6, 5))
@@ -140,7 +141,9 @@ def _plot_confusion(y_true: np.ndarray, y_pred: np.ndarray, labels: list[str], o
     plt.close(fig)
 
 
-def _robustness_curve(model, x: np.ndarray, y: np.ndarray, eps: np.ndarray, model_cfg: dict, output_path: Path) -> list[dict[str, float]]:
+def _robustness_curve(
+    model, x: np.ndarray, y: np.ndarray, eps: np.ndarray, model_cfg: dict, output_path: Path
+) -> list[dict[str, float]]:
     folds = int(model_cfg.get("cv_folds", 5))
     seed = int(model_cfg.get("random_state", 42))
     cv = StratifiedKFold(n_splits=folds, shuffle=True, random_state=seed)
@@ -199,7 +202,9 @@ def _robustness_curve(model, x: np.ndarray, y: np.ndarray, eps: np.ndarray, mode
     return rows
 
 
-def _leave_one_re_out(features_df: pd.DataFrame, feature_cols: list[str], model_builder) -> list[dict[str, float]]:
+def _leave_one_re_out(
+    features_df: pd.DataFrame, feature_cols: list[str], model_builder
+) -> list[dict[str, float]]:
     rows = []
     for re_test in sorted(features_df["Re"].unique()):
         train_df = features_df[features_df["Re"] != re_test]
@@ -259,7 +264,9 @@ def _write_sota_summary(
 
     lines.append("## Robustness Sweep")
     for row in robust_rows:
-        lines.append(f"- |eps|~{row['eps_bin_center']:.5f}: acc={row['accuracy']:.4f} (n={row['count']})")
+        lines.append(
+            f"- |eps|~{row['eps_bin_center']:.5f}: acc={row['accuracy']:.4f} (n={row['count']})"
+        )
 
     path.write_text("\n".join(lines), encoding="utf-8")
 

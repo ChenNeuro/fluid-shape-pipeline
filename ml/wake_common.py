@@ -9,7 +9,6 @@ from sklearn.model_selection import train_test_split
 from sim.geometry_mask import render_case_image
 from vision.wake_dataset import WakeBundle
 
-
 META_COLS = ["case_id", "shape", "Re", "dy", "eps", "seed"]
 
 VARIANTS = {
@@ -52,7 +51,10 @@ def build_label_maps(bundle: WakeBundle) -> LabelMaps:
 
 
 def stratification_labels(bundle: WakeBundle) -> np.ndarray:
-    return np.asarray([f"{shape}_Re{int(re_value)}" for shape, re_value in zip(bundle.shapes, bundle.re_values)], dtype=object)
+    return np.asarray(
+        [f"{shape}_Re{int(re_value)}" for shape, re_value in zip(bundle.shapes, bundle.re_values)],
+        dtype=object,
+    )
 
 
 def compute_stratified_test_n(n_total: int, n_strata: int, requested_ratio: float) -> int:
@@ -64,9 +66,13 @@ def compute_stratified_test_n(n_total: int, n_strata: int, requested_ratio: floa
     return min(max(requested_test_n, min_test_n), max_test_n)
 
 
-def repeated_holdout_split(strata: np.ndarray, *, test_n: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
+def repeated_holdout_split(
+    strata: np.ndarray, *, test_n: int, seed: int
+) -> tuple[np.ndarray, np.ndarray]:
     idx = np.arange(strata.shape[0], dtype=int)
-    idx_train, idx_test = train_test_split(idx, test_size=test_n, random_state=seed, stratify=strata)
+    idx_train, idx_test = train_test_split(
+        idx, test_size=test_n, random_state=seed, stratify=strata
+    )
     return np.sort(idx_train), np.sort(idx_test)
 
 
@@ -107,7 +113,9 @@ def render_targets(
     return np.stack(images, axis=0).astype(np.float32)
 
 
-def clip_params(dy_pred: np.ndarray, eps_pred: np.ndarray, cfg: dict) -> tuple[np.ndarray, np.ndarray]:
+def clip_params(
+    dy_pred: np.ndarray, eps_pred: np.ndarray, cfg: dict
+) -> tuple[np.ndarray, np.ndarray]:
     pert_cfg = cfg["simulation"]["perturb"]
     dy_min = float(pert_cfg.get("dy_min", -0.02))
     dy_max = float(pert_cfg.get("dy_max", 0.02))
@@ -117,7 +125,9 @@ def clip_params(dy_pred: np.ndarray, eps_pred: np.ndarray, cfg: dict) -> tuple[n
     return dy_clip.astype(np.float32), eps_clip.astype(np.float32)
 
 
-def obstacle_iou_and_dice(targets: np.ndarray, predictions: np.ndarray, threshold: float) -> dict[str, np.ndarray | float]:
+def obstacle_iou_and_dice(
+    targets: np.ndarray, predictions: np.ndarray, threshold: float
+) -> dict[str, np.ndarray | float]:
     target_mask = targets >= threshold
     pred_mask = predictions >= threshold
 

@@ -3,6 +3,7 @@ Flask web app for real-time wake-field shape classification.
 Run:  python web_app/app.py
 Open: http://127.0.0.1:5000
 """
+
 from __future__ import annotations
 
 import io
@@ -19,24 +20,25 @@ sys.path.insert(0, str(ROOT))
 os.chdir(str(ROOT))
 
 import cv2
+import matplotlib
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torchvision
-import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, render_template, request
 
 # ── Config ────────────────────────────────────────────────────────────────
 CONFIG_PATH = ROOT / "configs" / "wake_field_450.yaml"
 MODEL_PATH = ROOT / "models" / "wake_field_main.pt"
 
-from sim.config import load_config
 from ml.wake_common import build_label_maps
+from sim.config import load_config
+from vision.mae_vit_model import MultiScaleViTWakeNet
 from vision.wake_dataset import load_wake_bundle
 from vision.wake_model import MultiScaleWakeNet
-from vision.mae_vit_model import MultiScaleViTWakeNet
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
@@ -53,19 +55,43 @@ MODEL_KWARGS = None
 # ── Synthetic wake field generator ───────────────────────────────────────
 
 SHAPE_PROFILES = {
-    "circle":   {"decay": 0.54, "spread": 0.070, "alt_offset": 0.14, "deficit": 0.22, "lift_bias": 0.00},
-    "triangle": {"decay": 0.56, "spread": 0.074, "alt_offset": 0.13, "deficit": 0.24, "lift_bias": 0.00},
-    "airfoil":  {"decay": 0.50, "spread": 0.060, "alt_offset": 0.10, "deficit": 0.18, "lift_bias": 0.05},
-    "diamond":  {"decay": 0.60, "spread": 0.078, "alt_offset": 0.17, "deficit": 0.27, "lift_bias": 0.01},
-    "bar":      {"decay": 0.70, "spread": 0.090, "alt_offset": 0.19, "deficit": 0.33, "lift_bias": 0.00},
+    "circle": {
+        "decay": 0.54,
+        "spread": 0.070,
+        "alt_offset": 0.14,
+        "deficit": 0.22,
+        "lift_bias": 0.00,
+    },
+    "triangle": {
+        "decay": 0.56,
+        "spread": 0.074,
+        "alt_offset": 0.13,
+        "deficit": 0.24,
+        "lift_bias": 0.00,
+    },
+    "airfoil": {
+        "decay": 0.50,
+        "spread": 0.060,
+        "alt_offset": 0.10,
+        "deficit": 0.18,
+        "lift_bias": 0.05,
+    },
+    "diamond": {
+        "decay": 0.60,
+        "spread": 0.078,
+        "alt_offset": 0.17,
+        "deficit": 0.27,
+        "lift_bias": 0.01,
+    },
+    "bar": {"decay": 0.70, "spread": 0.090, "alt_offset": 0.19, "deficit": 0.33, "lift_bias": 0.00},
 }
 
 SHAPE_PARAMS = {
-    "circle":   {"st": 0.17, "amp": 0.13, "h2": 0.16, "h3": 0.05, "phase_gradient": 1.8},
+    "circle": {"st": 0.17, "amp": 0.13, "h2": 0.16, "h3": 0.05, "phase_gradient": 1.8},
     "triangle": {"st": 0.30, "amp": 0.20, "h2": 0.34, "h3": 0.18, "phase_gradient": 3.3},
-    "airfoil":  {"st": 0.11, "amp": 0.09, "h2": 0.08, "h3": 0.03, "phase_gradient": 1.2},
-    "diamond":  {"st": 0.24, "amp": 0.18, "h2": 0.42, "h3": 0.27, "phase_gradient": 2.8},
-    "bar":      {"st": 0.07, "amp": 0.24, "h2": 0.58, "h3": 0.42, "phase_gradient": 4.0},
+    "airfoil": {"st": 0.11, "amp": 0.09, "h2": 0.08, "h3": 0.03, "phase_gradient": 1.2},
+    "diamond": {"st": 0.24, "amp": 0.18, "h2": 0.42, "h3": 0.27, "phase_gradient": 2.8},
+    "bar": {"st": 0.07, "amp": 0.24, "h2": 0.58, "h3": 0.42, "phase_gradient": 4.0},
 }
 
 
@@ -104,14 +130,20 @@ def generate_wake_velocity_field(
     y_min = y_center - 0.5 * h_canvas
     y_max = y_center + 0.5 * h_canvas
 
-    x_phys = (np.arange(canvas_size, dtype=float) + 0.5) / canvas_size * (L_total - x_start) + x_start
+    x_phys = (np.arange(canvas_size, dtype=float) + 0.5) / canvas_size * (
+        L_total - x_start
+    ) + x_start
     y_phys = (np.arange(canvas_size, dtype=float) + 0.5) / canvas_size * (y_max - y_min) + y_min
     x_grid, y_grid = np.meshgrid(x_phys, y_phys)
 
     # Vortex shedding frequency
     st = float(params["st"])
-    f0 = st * U_mean / d * (1.0 + 0.08 * ((re_val - 200.0) / 200.0)) * (
-        1.0 + 0.25 * eps + 0.10 * (dy / H)
+    f0 = (
+        st
+        * U_mean
+        / d
+        * (1.0 + 0.08 * ((re_val - 200.0) / 200.0))
+        * (1.0 + 0.25 * eps + 0.10 * (dy / H))
     )
     f0 = max(0.05, f0)
 
@@ -184,13 +216,13 @@ def compute_vorticity(vel: np.ndarray) -> np.ndarray:
     # Forward/backward at edges
     omega[:, 0] = (uy[:, 1] - uy[:, 0]) - (ux[1, 0] - ux[-1 if 0 else 1, 0])
     omega[:, -1] = (uy[:, -1] - uy[:, -2]) - (ux[-1 if -1 else 0, -1] - ux[-2, -1])
-    omega[0, :] -= (ux[1, :] - ux[0, :])
-    omega[-1, :] -= (ux[-1, :] - ux[-2, :])
+    omega[0, :] -= ux[1, :] - ux[0, :]
+    omega[-1, :] -= ux[-1, :] - ux[-2, :]
     return omega.astype(np.float32)
 
 
 def compute_speed(vel: np.ndarray) -> np.ndarray:
-    return np.sqrt(vel[0]**2 + vel[1]**2).astype(np.float32)
+    return np.sqrt(vel[0] ** 2 + vel[1] ** 2).astype(np.float32)
 
 
 def normalize_field(field: np.ndarray) -> np.ndarray:
@@ -201,14 +233,22 @@ def normalize_field(field: np.ndarray) -> np.ndarray:
 
 
 def crop_box(
-    norm_x0: float, norm_y0: float,
-    norm_x1: float, norm_y1: float,
-    h: int, w: int,
+    norm_x0: float,
+    norm_y0: float,
+    norm_x1: float,
+    norm_y1: float,
+    h: int,
+    w: int,
 ) -> tuple[int, int, int, int]:
-    def _px(v, n): return int(np.clip(int(v * n), 0, n - 1))
-    x0 = _px(norm_x0, w); x1 = _px(norm_x1, w)
-    y0 = _px(norm_y0, h); y1 = _px(norm_y1, h)
-    x1 = max(x1, x0 + 1); y1 = max(y1, y0 + 1)
+    def _px(v, n):
+        return int(np.clip(int(v * n), 0, n - 1))
+
+    x0 = _px(norm_x0, w)
+    x1 = _px(norm_x1, w)
+    y0 = _px(norm_y0, h)
+    y1 = _px(norm_y1, h)
+    x1 = max(x1, x0 + 1)
+    y1 = max(y1, y0 + 1)
     return x0, y0, x1, y1
 
 
@@ -216,10 +256,13 @@ def resize_crop(field: np.ndarray, norm_box: list, output_size: int) -> np.ndarr
     _, h, w = field.shape
     x0, y0, x1, y1 = crop_box(norm_box[0], norm_box[1], norm_box[2], norm_box[3], h, w)
     crop = field[:, y0:y1, x0:x1]
-    resized = np.stack([
-        cv2.resize(crop[c], (output_size, output_size), interpolation=cv2.INTER_LINEAR)
-        for c in range(crop.shape[0])
-    ], axis=0)
+    resized = np.stack(
+        [
+            cv2.resize(crop[c], (output_size, output_size), interpolation=cv2.INTER_LINEAR)
+            for c in range(crop.shape[0])
+        ],
+        axis=0,
+    )
     return resized.astype(np.float32)
 
 
@@ -234,7 +277,9 @@ def build_distance_crop_box(
     h_canvas = canvas_y_max - canvas_y_min
     x_start_phys = canvas_x_start + downstream_h * h_canvas
     x_end_phys = canvas_x_end
-    x0_norm = float(np.clip((x_start_phys - canvas_x_start) / (canvas_x_end - canvas_x_start), 0.0, 1.0))
+    x0_norm = float(
+        np.clip((x_start_phys - canvas_x_start) / (canvas_x_end - canvas_x_start), 0.0, 1.0)
+    )
     x1_norm = 1.0
     canvas_y_center = (canvas_y_min + canvas_y_max) * 0.5
     y0_norm = 0.0
@@ -287,6 +332,7 @@ def prepare_multiscale_input(
 
 # ── Model inference ──────────────────────────────────────────────────────
 
+
 def predict(x: np.ndarray) -> dict:
     """Run model on [S, 4, H, W] input. Returns prediction dict."""
     if model is None:
@@ -308,7 +354,9 @@ def predict(x: np.ndarray) -> dict:
 
     return {
         "shape": label_maps.idx_to_shape[shape_idx],
-        "shape_probs": {label_maps.idx_to_shape[i]: float(shape_probs[i]) for i in range(len(shape_probs))},
+        "shape_probs": {
+            label_maps.idx_to_shape[i]: float(shape_probs[i]) for i in range(len(shape_probs))
+        },
         "dy": float(params_pred[0]),
         "eps": float(params_pred[1]),
         "re": label_maps.idx_to_re[re_idx],
@@ -362,8 +410,9 @@ def render_vorticity_fig(
         else:
             crops_padded.append(c[:, :max_w])
 
-    fig, axes = plt.subplots(1, 4, figsize=(14, 3.8),
-                               gridspec_kw={"width_ratios": [1, 1, 1, 0.65], "wspace": 0.25})
+    fig, axes = plt.subplots(
+        1, 4, figsize=(14, 3.8), gridspec_kw={"width_ratios": [1, 1, 1, 0.65], "wspace": 0.25}
+    )
     fig.patch.set_facecolor("#1a1a2e")
     for ax in axes[:3]:
         ax.set_facecolor("#1a1a2e")
@@ -374,10 +423,15 @@ def render_vorticity_fig(
 
     for i, (crop, label) in enumerate(zip(crops_padded, dist_labels)):
         ax = axes[i]
-        im = ax.imshow(crop, cmap=cmap, vmin=vmin, vmax=vmax,
-                       origin="lower", aspect="auto",
-                       extent=[float(x_starts_phys[i]), canvas_x_end,
-                               canvas_y_min, canvas_y_max])
+        im = ax.imshow(
+            crop,
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            origin="lower",
+            aspect="auto",
+            extent=[float(x_starts_phys[i]), canvas_x_end, canvas_y_min, canvas_y_max],
+        )
         ax.set_title(label, fontsize=9, fontweight="bold", color="#ECEFF1", pad=4)
         ax.tick_params(colors="#78909C", labelsize=7)
         for spine in ax.spines.values():
@@ -389,55 +443,140 @@ def render_vorticity_fig(
     ax_p.axis("off")
 
     shape_color_map = {
-        "circle": "#58a6ff", "triangle": "#f97583", "airfoil": "#d2a8ff",
-        "diamond": "#56d364", "bar": "#ffa657"
+        "circle": "#58a6ff",
+        "triangle": "#f97583",
+        "airfoil": "#d2a8ff",
+        "diamond": "#56d364",
+        "bar": "#ffa657",
     }
     pred_color = shape_color_map.get(pred_shape, "#90A4AE")
     correct = shape == pred_shape
 
-    ax_p.text(0.5, 0.97, "PREDICTION", ha="center", va="top",
-              fontsize=10, fontweight="bold", color="#ECEFF1", transform=ax_p.transAxes)
-    ax_p.text(0.5, 0.88, pred_shape.upper(), ha="center", va="top",
-              fontsize=20, fontweight="bold", color=pred_color, transform=ax_p.transAxes)
+    ax_p.text(
+        0.5,
+        0.97,
+        "PREDICTION",
+        ha="center",
+        va="top",
+        fontsize=10,
+        fontweight="bold",
+        color="#ECEFF1",
+        transform=ax_p.transAxes,
+    )
+    ax_p.text(
+        0.5,
+        0.88,
+        pred_shape.upper(),
+        ha="center",
+        va="top",
+        fontsize=20,
+        fontweight="bold",
+        color=pred_color,
+        transform=ax_p.transAxes,
+    )
 
     badge_bg = "#1B4332" if correct else "#5C1010"
     badge_fc = "#3FB950" if correct else "#F85149"
     badge_txt = "CORRECT" if correct else "WRONG"
-    ax_p.add_patch(plt.Rectangle((0.05, 0.78), 0.9, 0.07, facecolor=badge_bg,
-                                   edgecolor=badge_fc, lw=1.5, transform=ax_p.transAxes))
-    ax_p.text(0.5, 0.82, badge_txt, ha="center", va="center",
-              fontsize=9, fontweight="bold", color=badge_fc, transform=ax_p.transAxes)
+    ax_p.add_patch(
+        plt.Rectangle(
+            (0.05, 0.78),
+            0.9,
+            0.07,
+            facecolor=badge_bg,
+            edgecolor=badge_fc,
+            lw=1.5,
+            transform=ax_p.transAxes,
+        )
+    )
+    ax_p.text(
+        0.5,
+        0.82,
+        badge_txt,
+        ha="center",
+        va="center",
+        fontsize=9,
+        fontweight="bold",
+        color=badge_fc,
+        transform=ax_p.transAxes,
+    )
 
-    ax_p.text(0.5, 0.74, "Confidence", ha="center", va="top",
-              fontsize=8, color="#78909C", transform=ax_p.transAxes)
+    ax_p.text(
+        0.5,
+        0.74,
+        "Confidence",
+        ha="center",
+        va="top",
+        fontsize=8,
+        color="#78909C",
+        transform=ax_p.transAxes,
+    )
 
     sorted_probs = sorted(pred_probs.items(), key=lambda x: x[1], reverse=True)
     for k, (s, p) in enumerate(sorted_probs):
         bar_c = shape_color_map.get(s, "#78909C")
         row_y = 0.68 - k * 0.115
         bold = "bold" if s == pred_shape else "normal"
-        ax_p.text(0.05, row_y, s[:7], ha="left", va="top",
-                  fontsize=8, color=bar_c, fontweight=bold, transform=ax_p.transAxes)
-        ax_p.text(0.97, row_y, f"{p:.0%}", ha="right", va="top",
-                  fontsize=8, color=bar_c, fontweight=bold, transform=ax_p.transAxes)
-        ax_p.add_patch(plt.Rectangle((0.05, row_y - 0.04), 0.9 * p, 0.03,
-                                      color=bar_c, transform=ax_p.transAxes))
+        ax_p.text(
+            0.05,
+            row_y,
+            s[:7],
+            ha="left",
+            va="top",
+            fontsize=8,
+            color=bar_c,
+            fontweight=bold,
+            transform=ax_p.transAxes,
+        )
+        ax_p.text(
+            0.97,
+            row_y,
+            f"{p:.0%}",
+            ha="right",
+            va="top",
+            fontsize=8,
+            color=bar_c,
+            fontweight=bold,
+            transform=ax_p.transAxes,
+        )
+        ax_p.add_patch(
+            plt.Rectangle(
+                (0.05, row_y - 0.04), 0.9 * p, 0.03, color=bar_c, transform=ax_p.transAxes
+            )
+        )
 
-    ax_p.text(0.5, 0.12, f"dy={pred_dy:.3f}  ε={pred_eps:.3f}",
-              ha="center", va="top", fontsize=8, color="#78909C", transform=ax_p.transAxes)
-    ax_p.text(0.5, 0.05, f"Re={re_val}", ha="center", va="top",
-              fontsize=8, color="#78909C", transform=ax_p.transAxes)
+    ax_p.text(
+        0.5,
+        0.12,
+        f"dy={pred_dy:.3f}  ε={pred_eps:.3f}",
+        ha="center",
+        va="top",
+        fontsize=8,
+        color="#78909C",
+        transform=ax_p.transAxes,
+    )
+    ax_p.text(
+        0.5,
+        0.05,
+        f"Re={re_val}",
+        ha="center",
+        va="top",
+        fontsize=8,
+        color="#78909C",
+        transform=ax_p.transAxes,
+    )
 
     buf = io.BytesIO()
-    plt.savefig(buf, format="png", dpi=150, bbox_inches="tight",
-               facecolor=fig.get_facecolor())
+    plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close(fig)
     buf.seek(0)
     import base64
+
     return "data:image/png;base64," + base64.b64encode(buf.read()).decode()
 
 
 # ── Flask routes ─────────────────────────────────────────────────────────
+
 
 @app.route("/")
 def index():
@@ -447,6 +586,7 @@ def index():
 @app.route("/api/predict", methods=["POST"])
 def api_predict():
     import random as _random
+
     data = request.get_json() or {}
     shape = str(data.get("shape", "circle"))
     re_val = float(data.get("re", 100))
@@ -458,8 +598,7 @@ def api_predict():
 
     # 1. Generate velocity field
     vel, roi = generate_wake_velocity_field(
-        shape=shape, re_val=re_val, dy=dy, eps=eps,
-        seed=seed, canvas_size=canvas_size
+        shape=shape, re_val=re_val, dy=dy, eps=eps, seed=seed, canvas_size=canvas_size
     )
 
     # 2. Compute vorticity for visualization
@@ -473,10 +612,16 @@ def api_predict():
     if model is not None:
         result = predict(x)
         vort_img = render_vorticity_fig(
-            vort, roi,
-            shape, re_val, dy, eps,
-            result["shape"], result["shape_probs"],
-            result["dy"], result["eps"]
+            vort,
+            roi,
+            shape,
+            re_val,
+            dy,
+            eps,
+            result["shape"],
+            result["shape_probs"],
+            result["dy"],
+            result["eps"],
         )
         result["vorticity_img"] = vort_img
         result["success"] = True
@@ -496,8 +641,9 @@ def api_predict():
         fig.patch.set_facecolor("#1a1a2e")
         ax.set_facecolor("#1a1a2e")
         show_x0 = int(vort.shape[1] * 0.05)
-        im = ax.imshow(vort[:, show_x0:], cmap="RdBu_r", vmin=-4, vmax=4,
-                        origin="lower", aspect="auto")
+        im = ax.imshow(
+            vort[:, show_x0:], cmap="RdBu_r", vmin=-4, vmax=4, origin="lower", aspect="auto"
+        )
         plt.colorbar(im, ax=ax, label="vorticity")
         ax.set_title(f"No model loaded — showing vorticity (shape={shape})", color="white")
         buf = io.BytesIO()
@@ -505,12 +651,14 @@ def api_predict():
         plt.close(fig)
         buf.seek(0)
         import base64
+
         result["vorticity_img"] = "data:image/png;base64," + base64.b64encode(buf.read()).decode()
 
     return jsonify(result)
 
 
 # ── Model loading ─────────────────────────────────────────────────────────
+
 
 def load_model():
     global model, cfg, label_maps, MODEL_TYPE, MODEL_KWARGS
@@ -519,7 +667,9 @@ def load_model():
     label_maps = build_label_maps(bundle)
 
     if not MODEL_PATH.exists():
-        print(f"[WARNING] Model not found at {MODEL_PATH} — running in demo mode (no classification)")
+        print(
+            f"[WARNING] Model not found at {MODEL_PATH} — running in demo mode (no classification)"
+        )
         print(f"[INFO] Run: python -m ml.train_wake --config {CONFIG_PATH}")
         return
 

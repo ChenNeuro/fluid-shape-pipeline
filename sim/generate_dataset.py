@@ -18,8 +18,15 @@ from sim.solvers import build_simulator
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate raw probe datasets")
     parser.add_argument("--config", default="configs/default.yaml", help="Path to YAML config")
-    parser.add_argument("--solver", default=None, choices=["synthetic", "openfoam"], help="Override solver in config")
-    parser.add_argument("--workers", type=int, default=None, help="Number of parallel workers (0/1 for sequential)")
+    parser.add_argument(
+        "--solver",
+        default=None,
+        choices=["synthetic", "openfoam"],
+        help="Override solver in config",
+    )
+    parser.add_argument(
+        "--workers", type=int, default=None, help="Number of parallel workers (0/1 for sequential)"
+    )
     return parser.parse_args()
 
 
@@ -35,7 +42,9 @@ def run_case_with_retries(case_spec: CaseSpec, simulator, max_retries: int, raw_
             output_csv = simulator.run_case(case_spec, case_dir)
             metadata_json = find_metadata_json(case_dir)
             elapsed = time.time() - start
-            logger.info("Case %s succeeded on attempt %d in %.2fs", case_spec.case_id, attempts, elapsed)
+            logger.info(
+                "Case %s succeeded on attempt %d in %.2fs", case_spec.case_id, attempts, elapsed
+            )
             return {
                 **case_spec.to_dict(),
                 "status": "success",
@@ -47,7 +56,9 @@ def run_case_with_retries(case_spec: CaseSpec, simulator, max_retries: int, raw_
             }
         except Exception as exc:  # pylint: disable=broad-except
             last_error = str(exc)
-            logger.warning("Case %s failed on attempt %d: %s", case_spec.case_id, attempts, last_error)
+            logger.warning(
+                "Case %s failed on attempt %d: %s", case_spec.case_id, attempts, last_error
+            )
 
     elapsed = time.time() - start
     logger.error("Case %s failed after %d attempts", case_spec.case_id, attempts)
@@ -89,12 +100,18 @@ def build_index_rows(manifest_df: pd.DataFrame, solver_name: str) -> list[dict]:
                 sampling = payload.get("sampling", {})
                 row.update(
                     {
-                        "n_probes": int(probes.get("count", 0)) if probes.get("count") is not None else 0,
+                        "n_probes": (
+                            int(probes.get("count", 0)) if probes.get("count") is not None else 0
+                        ),
                         "probe_x": probes.get("x"),
                         "probe_y_min": min(probes.get("y", [])) if probes.get("y") else None,
                         "probe_y_max": max(probes.get("y", [])) if probes.get("y") else None,
                         "dt": sampling.get("dt"),
-                        "n_samples": int(sampling.get("n_samples", 0)) if sampling.get("n_samples") is not None else 0,
+                        "n_samples": (
+                            int(sampling.get("n_samples", 0))
+                            if sampling.get("n_samples") is not None
+                            else 0
+                        ),
                         "t_start": sampling.get("t_start"),
                         "t_end": sampling.get("t_end"),
                         "wake_frames_npz": payload.get("files", {}).get("wake_frames_npz", ""),
@@ -125,26 +142,39 @@ def main() -> None:
     case_specs = build_case_specs(cfg)
     simulator = build_simulator(solver_name, cfg, logger)
 
-    logger.info("Starting dataset generation with solver=%s, workers=%d, cases=%d", solver_name, workers, len(case_specs))
+    logger.info(
+        "Starting dataset generation with solver=%s, workers=%d, cases=%d",
+        solver_name,
+        workers,
+        len(case_specs),
+    )
 
     results = []
     if workers and workers > 1:
         with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = {
-                executor.submit(run_case_with_retries, case_spec, simulator, max_retries, raw_root, logger): case_spec
+                executor.submit(
+                    run_case_with_retries, case_spec, simulator, max_retries, raw_root, logger
+                ): case_spec
                 for case_spec in case_specs
             }
             for future in as_completed(futures):
                 results.append(future.result())
     else:
         for case_spec in case_specs:
-            results.append(run_case_with_retries(case_spec, simulator, max_retries, raw_root, logger))
+            results.append(
+                run_case_with_retries(case_spec, simulator, max_retries, raw_root, logger)
+            )
 
     manifest_df = pd.DataFrame(results).sort_values("case_id").reset_index(drop=True)
     manifest_path = raw_root / "manifest.csv"
     manifest_df.to_csv(manifest_path, index=False)
 
-    index_df = pd.DataFrame(build_index_rows(manifest_df, solver_name)).sort_values("case_id").reset_index(drop=True)
+    index_df = (
+        pd.DataFrame(build_index_rows(manifest_df, solver_name))
+        .sort_values("case_id")
+        .reset_index(drop=True)
+    )
     index_path = raw_root / "index.csv"
     index_df.to_csv(index_path, index=False)
 
@@ -167,7 +197,12 @@ def main() -> None:
     with summary_path.open("w", encoding="utf-8") as handle:
         json.dump(summary, handle, indent=2)
 
-    logger.info("Dataset generation complete. success=%d failed=%d failure_rate=%.2f%%", n_success, n_failed, failure_rate * 100.0)
+    logger.info(
+        "Dataset generation complete. success=%d failed=%d failure_rate=%.2f%%",
+        n_success,
+        n_failed,
+        failure_rate * 100.0,
+    )
 
 
 if __name__ == "__main__":

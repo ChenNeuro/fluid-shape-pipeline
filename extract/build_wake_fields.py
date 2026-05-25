@@ -12,8 +12,12 @@ from vision.wake_field_builder import build_case_wake_field
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build wake-field tensors from short wake frame sequences")
-    parser.add_argument("--config", default="configs/wake_field_450.yaml", help="Path to YAML config")
+    parser = argparse.ArgumentParser(
+        description="Build wake-field tensors from short wake frame sequences"
+    )
+    parser.add_argument(
+        "--config", default="configs/wake_field_450.yaml", help="Path to YAML config"
+    )
     return parser.parse_args()
 
 
@@ -25,7 +29,9 @@ def main() -> None:
 
     manifest_path = root / "data" / "raw" / "manifest.csv"
     if not manifest_path.exists():
-        raise FileNotFoundError(f"Manifest not found: {manifest_path}. Run dataset generation first.")
+        raise FileNotFoundError(
+            f"Manifest not found: {manifest_path}. Run dataset generation first."
+        )
 
     manifest = pd.read_csv(manifest_path)
     ok_cases = manifest[manifest["status"] == "success"].copy()
@@ -40,7 +46,9 @@ def main() -> None:
         try:
             find_wake_frames_npz(case_dir)
         except FileNotFoundError:
-            logger.warning("Skipping case %s because wake_frames.npz is missing in %s", case_id, case_dir)
+            logger.warning(
+                "Skipping case %s because wake_frames.npz is missing in %s", case_id, case_dir
+            )
             skipped += 1
             continue
 
@@ -66,7 +74,9 @@ def main() -> None:
     }
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
-    logger.info("Wake-field build complete. rows=%d skipped=%d -> %s", len(rows), skipped, index_path)
+    logger.info(
+        "Wake-field build complete. rows=%d skipped=%d -> %s", len(rows), skipped, index_path
+    )
 
 
 if __name__ == "__main__":

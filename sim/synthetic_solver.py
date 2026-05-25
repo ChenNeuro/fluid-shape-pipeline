@@ -46,12 +46,48 @@ class SyntheticSimulator:
 
     def _shape_profile(self, shape: str) -> dict[str, float]:
         profiles = {
-            "circle": {"decay": 0.54, "spread": 0.070, "alt_offset": 0.14, "deficit": 0.22, "lift_bias": 0.00},
-            "square": {"decay": 0.62, "spread": 0.080, "alt_offset": 0.16, "deficit": 0.28, "lift_bias": 0.00},
-            "triangle": {"decay": 0.56, "spread": 0.074, "alt_offset": 0.13, "deficit": 0.24, "lift_bias": 0.00},
-            "airfoil": {"decay": 0.50, "spread": 0.060, "alt_offset": 0.10, "deficit": 0.18, "lift_bias": 0.05},
-            "diamond": {"decay": 0.60, "spread": 0.078, "alt_offset": 0.17, "deficit": 0.27, "lift_bias": 0.01},
-            "bar": {"decay": 0.70, "spread": 0.090, "alt_offset": 0.19, "deficit": 0.33, "lift_bias": 0.00},
+            "circle": {
+                "decay": 0.54,
+                "spread": 0.070,
+                "alt_offset": 0.14,
+                "deficit": 0.22,
+                "lift_bias": 0.00,
+            },
+            "square": {
+                "decay": 0.62,
+                "spread": 0.080,
+                "alt_offset": 0.16,
+                "deficit": 0.28,
+                "lift_bias": 0.00,
+            },
+            "triangle": {
+                "decay": 0.56,
+                "spread": 0.074,
+                "alt_offset": 0.13,
+                "deficit": 0.24,
+                "lift_bias": 0.00,
+            },
+            "airfoil": {
+                "decay": 0.50,
+                "spread": 0.060,
+                "alt_offset": 0.10,
+                "deficit": 0.18,
+                "lift_bias": 0.05,
+            },
+            "diamond": {
+                "decay": 0.60,
+                "spread": 0.078,
+                "alt_offset": 0.17,
+                "deficit": 0.27,
+                "lift_bias": 0.01,
+            },
+            "bar": {
+                "decay": 0.70,
+                "spread": 0.090,
+                "alt_offset": 0.19,
+                "deficit": 0.33,
+                "lift_bias": 0.00,
+            },
         }
         if shape not in profiles:
             raise ValueError(f"Unsupported shape: {shape}")
@@ -95,14 +131,24 @@ class SyntheticSimulator:
         if shape == "triangle":
             return 0.55 + 0.45 * np.cos(2.0 * np.pi * y_norm + 0.6)
         if shape == "airfoil":
-            mode = 0.58 + 0.24 * np.cos(np.pi * (y_norm - 0.42)) + 0.12 * np.sin(2.0 * np.pi * y_norm + 0.5)
+            mode = (
+                0.58
+                + 0.24 * np.cos(np.pi * (y_norm - 0.42))
+                + 0.12 * np.sin(2.0 * np.pi * y_norm + 0.5)
+            )
             return np.clip(mode, 0.15, None)
         if shape == "diamond":
-            mode = 0.52 + 0.28 * np.cos(2.0 * np.pi * (y_norm - 0.5)) + 0.22 * np.sin(4.0 * np.pi * y_norm + 0.4)
+            mode = (
+                0.52
+                + 0.28 * np.cos(2.0 * np.pi * (y_norm - 0.5))
+                + 0.22 * np.sin(4.0 * np.pi * y_norm + 0.4)
+            )
             return np.clip(mode, 0.12, None)
         if shape == "bar":
             center = np.exp(-((y_norm - 0.5) ** 2) / (2.0 * 0.10**2))
-            shoulders = np.exp(-((y_norm - 0.32) ** 2) / (2.0 * 0.07**2)) + np.exp(-((y_norm - 0.68) ** 2) / (2.0 * 0.07**2))
+            shoulders = np.exp(-((y_norm - 0.32) ** 2) / (2.0 * 0.07**2)) + np.exp(
+                -((y_norm - 0.68) ** 2) / (2.0 * 0.07**2)
+            )
             mode = 0.45 + 0.55 * center + 0.25 * shoulders
             return np.clip(mode, 0.10, None)
         raise ValueError(f"Unsupported shape: {shape}")
@@ -119,8 +165,12 @@ class SyntheticSimulator:
         y_min = y_center - 0.5 * h_canvas
         y_max = y_center + 0.5 * h_canvas
 
-        x = (np.arange(self.field_size, dtype=float) + 0.5) / self.field_size * (x_end - x_start) + x_start
-        y = (np.arange(self.field_size, dtype=float) + 0.5) / self.field_size * (y_max - y_min) + y_min
+        x = (np.arange(self.field_size, dtype=float) + 0.5) / self.field_size * (
+            x_end - x_start
+        ) + x_start
+        y = (np.arange(self.field_size, dtype=float) + 0.5) / self.field_size * (
+            y_max - y_min
+        ) + y_min
         return x, y, x_start, x_end, y_min, y_max
 
     def _wake_velocity_field(
@@ -165,7 +215,9 @@ class SyntheticSimulator:
 
         decay = max(0.25, profile["decay"])
         wake_env = np.exp(-xn / decay)
-        phase = 2.0 * np.pi * (0.65 * xn - f0 * t) + float(params.get("phase_gradient", 2.0)) * cross
+        phase = (
+            2.0 * np.pi * (0.65 * xn - f0 * t) + float(params.get("phase_gradient", 2.0)) * cross
+        )
         harmonic = np.sin(phase)
         harmonic += float(params.get("h2", 0.0)) * np.sin(2.0 * phase + 0.3)
         harmonic += float(params.get("h3", 0.0)) * np.sin(3.0 * phase - 0.2)
@@ -189,7 +241,9 @@ class SyntheticSimulator:
         return u_field.astype(np.float32), v_field.astype(np.float32), mask.astype(np.float32)
 
     @staticmethod
-    def _particle_texture(rng: np.random.Generator, height: int, width: int, density: float, blur_sigma: float) -> np.ndarray:
+    def _particle_texture(
+        rng: np.random.Generator, height: int, width: int, density: float, blur_sigma: float
+    ) -> np.ndarray:
         texture = np.zeros((height, width), dtype=np.float32)
         dots = rng.random((height, width)) < density
         if np.any(dots):
@@ -197,9 +251,13 @@ class SyntheticSimulator:
         texture = cv2.GaussianBlur(texture, (0, 0), sigmaX=blur_sigma, sigmaY=blur_sigma)
         return np.clip(texture, 0.0, 1.0)
 
-    def _render_wake_frames(self, case_spec, rng: np.random.Generator, t_sample: np.ndarray, f0: float, amp_base: float) -> dict:
+    def _render_wake_frames(
+        self, case_spec, rng: np.random.Generator, t_sample: np.ndarray, f0: float, amp_base: float
+    ) -> dict:
         if t_sample.size == 0:
-            raise RuntimeError("Synthetic solver produced no steady samples for wake frame rendering")
+            raise RuntimeError(
+                "Synthetic solver produced no steady samples for wake frame rendering"
+            )
 
         x_coords, y_coords, x_min, x_max, y_min, y_max = self._wake_canvas()
         x_grid, y_grid = np.meshgrid(x_coords, y_coords)
@@ -214,10 +272,14 @@ class SyntheticSimulator:
 
         height = self.field_size
         width = self.field_size
-        base_density = 0.055 + 0.02 * abs(float(case_spec.eps)) + 0.01 * (float(case_spec.re) / 300.0)
+        base_density = (
+            0.055 + 0.02 * abs(float(case_spec.eps)) + 0.01 * (float(case_spec.re) / 300.0)
+        )
         current = self._particle_texture(rng, height, width, density=base_density, blur_sigma=0.75)
 
-        grid_x_pix, grid_y_pix = np.meshgrid(np.arange(width, dtype=np.float32), np.arange(height, dtype=np.float32))
+        grid_x_pix, grid_y_pix = np.meshgrid(
+            np.arange(width, dtype=np.float32), np.arange(height, dtype=np.float32)
+        )
         x_scale = width / max(1e-6, x_max - x_min)
         y_scale = height / max(1e-6, y_max - y_min)
         motion_gain = 0.85
@@ -235,7 +297,9 @@ class SyntheticSimulator:
             )
             if mask_ref is None:
                 mask_ref = mask_now
-            frame = np.clip(current * mask_now + rng.normal(0.0, 0.012, size=current.shape), 0.0, 1.0)
+            frame = np.clip(
+                current * mask_now + rng.normal(0.0, 0.012, size=current.shape), 0.0, 1.0
+            )
             frame *= 0.92 + 0.12 * rng.random()
             frames.append(np.clip(frame, 0.0, 1.0).astype(np.float32))
 
@@ -247,11 +311,21 @@ class SyntheticSimulator:
             y_disp = np.clip(v_now * dt_frame * y_scale * motion_gain, -2.5, 2.5).astype(np.float32)
             map_x = grid_x_pix - x_disp
             map_y = grid_y_pix - y_disp
-            warped = cv2.remap(current, map_x, map_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT101)
-            injected = self._particle_texture(rng, height, width, density=base_density * 0.12, blur_sigma=0.65)
+            warped = cv2.remap(
+                current,
+                map_x,
+                map_y,
+                interpolation=cv2.INTER_LINEAR,
+                borderMode=cv2.BORDER_REFLECT101,
+            )
+            injected = self._particle_texture(
+                rng, height, width, density=base_density * 0.12, blur_sigma=0.65
+            )
             warped = 0.95 * warped + 0.05 * injected
             warped = cv2.GaussianBlur(warped, (0, 0), sigmaX=0.6, sigmaY=0.6)
-            current = np.clip(warped * mask_now + rng.normal(0.0, 0.005, size=warped.shape), 0.0, 1.0).astype(np.float32)
+            current = np.clip(
+                warped * mask_now + rng.normal(0.0, 0.005, size=warped.shape), 0.0, 1.0
+            ).astype(np.float32)
 
         if mask_ref is None:
             raise RuntimeError("Wake frame renderer failed to produce a reference mask")
@@ -310,10 +384,18 @@ class SyntheticSimulator:
         if challenge_enabled:
             noise_std *= float(self.challenge_cfg.get("noise_multiplier", 1.0))
 
-        common_amp = float(self.challenge_cfg.get("common_mode_amp", 0.0)) if challenge_enabled else 0.0
-        common_freq_ratio = float(self.challenge_cfg.get("common_mode_freq_ratio", 0.85)) if challenge_enabled else 0.85
+        common_amp = (
+            float(self.challenge_cfg.get("common_mode_amp", 0.0)) if challenge_enabled else 0.0
+        )
+        common_freq_ratio = (
+            float(self.challenge_cfg.get("common_mode_freq_ratio", 0.85))
+            if challenge_enabled
+            else 0.85
+        )
         drift_amp = float(self.challenge_cfg.get("drift_amp", 0.0)) if challenge_enabled else 0.0
-        drift_freq_ratio = float(self.challenge_cfg.get("drift_freq_ratio", 0.08)) if challenge_enabled else 0.08
+        drift_freq_ratio = (
+            float(self.challenge_cfg.get("drift_freq_ratio", 0.08)) if challenge_enabled else 0.08
+        )
 
         startup = 1.0 - np.exp(-t_total / max(1.0, float(self.time_cfg["transient_time"]) / 2.0))
 
@@ -326,13 +408,21 @@ class SyntheticSimulator:
             harmonic2 = h2 * np.sin(2.0 * np.pi * 2.0 * f0 * t_total + 0.55 * phi)
             harmonic3 = h3 * np.sin(2.0 * np.pi * 3.0 * f0 * t_total + 0.25 * phi)
             broadband = 0.08 * np.sin(2.0 * np.pi * (f0 * 0.35) * t_total + 1.2 * phi)
-            common_mode = common_amp * np.sin(2.0 * np.pi * (common_freq_ratio * f0) * t_total + 0.1 * phi)
+            common_mode = common_amp * np.sin(
+                2.0 * np.pi * (common_freq_ratio * f0) * t_total + 0.1 * phi
+            )
             drift = drift_amp * np.sin(2.0 * np.pi * (drift_freq_ratio * f0) * t_total + 0.3 * phi)
 
-            signal = (fundamental + harmonic2 + harmonic3 + broadband + common_mode + drift) * startup
-            noise = rng.normal(0.0, noise_std * (1.0 + 3.0 * abs(float(case_spec.eps))), size=n_total)
+            signal = (
+                fundamental + harmonic2 + harmonic3 + broadband + common_mode + drift
+            ) * startup
+            noise = rng.normal(
+                0.0, noise_std * (1.0 + 3.0 * abs(float(case_spec.eps))), size=n_total
+            )
 
-            u_total[:, idx] = self.u_mean * base_u[idx] * lens_factor[idx] + amplitude[idx] * signal + noise
+            u_total[:, idx] = (
+                self.u_mean * base_u[idx] * lens_factor[idx] + amplitude[idx] * signal + noise
+            )
 
         if challenge_enabled:
             probe_mix = float(self.challenge_cfg.get("probe_mix", 0.0))
@@ -399,7 +489,9 @@ class SyntheticSimulator:
         }
 
         if self._should_emit_wake_frames():
-            wake_payload = self._render_wake_frames(case_spec, rng, t_sample=t_sample, f0=f0, amp_base=amp_base)
+            wake_payload = self._render_wake_frames(
+                case_spec, rng, t_sample=t_sample, f0=f0, amp_base=amp_base
+            )
             wake_frames_path = out_dir / WAKE_FRAMES_FILENAME
             np.savez_compressed(
                 wake_frames_path,

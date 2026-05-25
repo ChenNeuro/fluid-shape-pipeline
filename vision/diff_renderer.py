@@ -43,8 +43,14 @@ class DifferentiableShapeRenderer(nn.Module):
         y_min = y_center - 0.5 * h_canvas
         y_max = y_center + 0.5 * h_canvas
 
-        x_phys = (torch.arange(self.image_size, dtype=torch.float32, device=device) + 0.5) / self.image_size * self.l_total
-        y_phys = (torch.arange(self.image_size, dtype=torch.float32, device=device) + 0.5) / self.image_size * (y_max - y_min) + y_min
+        x_phys = (
+            (torch.arange(self.image_size, dtype=torch.float32, device=device) + 0.5)
+            / self.image_size
+            * self.l_total
+        )
+        y_phys = (
+            torch.arange(self.image_size, dtype=torch.float32, device=device) + 0.5
+        ) / self.image_size * (y_max - y_min) + y_min
 
         grid_x, grid_y = torch.meshgrid(x_phys, y_phys, indexing="xy")
         return grid_x, grid_y
@@ -60,7 +66,9 @@ class DifferentiableShapeRenderer(nn.Module):
         cross_num = (px - ax_t) * aby - (py - ay_t) * abx
         return cross_num / (len_ab + 1e-12)
 
-    def _shape_sdf(self, px: torch.Tensor, py: torch.Tensor, shape_idx: int, cy: torch.Tensor) -> torch.Tensor:
+    def _shape_sdf(
+        self, px: torch.Tensor, py: torch.Tensor, shape_idx: int, cy: torch.Tensor
+    ) -> torch.Tensor:
         if shape_idx == 0:
             # Circle: Euclidean SDF (negative inside)
             return torch.sqrt((px - self.x0) ** 2 + (py - cy) ** 2 + 1e-12) - 0.5 * self.d
@@ -83,21 +91,33 @@ class DifferentiableShapeRenderer(nn.Module):
         elif shape_idx == 2:
             xr = (px - self.x0) / self.d + 0.5
             xr_c = torch.clamp(xr, 0.0, 1.0)
-            yt_c = 5.0 * 0.14 * (
-                0.2969 * torch.sqrt(xr_c + 1e-12)
-                - 0.1260 * xr_c
-                - 0.3516 * xr_c ** 2
-                + 0.2843 * xr_c ** 3
-                - 0.1015 * xr_c ** 4
+            yt_c = (
+                5.0
+                * 0.14
+                * (
+                    0.2969 * torch.sqrt(xr_c + 1e-12)
+                    - 0.1260 * xr_c
+                    - 0.3516 * xr_c**2
+                    + 0.2843 * xr_c**3
+                    - 0.1015 * xr_c**4
+                )
             )
             half_thickness = self.d * yt_c
             upper_dist = py - (cy + half_thickness)
             lower_dist = (cy - half_thickness) - py
             inside = (py >= (cy - half_thickness)) & (py <= (cy + half_thickness))
-            return torch.where(inside, -torch.min(torch.abs(upper_dist), torch.abs(lower_dist)), torch.min(torch.abs(upper_dist), torch.abs(lower_dist)))
+            return torch.where(
+                inside,
+                -torch.min(torch.abs(upper_dist), torch.abs(lower_dist)),
+                torch.min(torch.abs(upper_dist), torch.abs(lower_dist)),
+            )
 
         elif shape_idx == 3:
-            return torch.abs(px - self.x0) / (0.56 * self.d + 1e-12) + torch.abs(py - cy) / (0.38 * self.d + 1e-12) - 1.0
+            return (
+                torch.abs(px - self.x0) / (0.56 * self.d + 1e-12)
+                + torch.abs(py - cy) / (0.38 * self.d + 1e-12)
+                - 1.0
+            )
 
         elif shape_idx == 4:
             qx = torch.abs(px - self.x0) - 0.75 * self.d
@@ -109,7 +129,9 @@ class DifferentiableShapeRenderer(nn.Module):
         else:
             raise ValueError(f"Unknown shape index: {shape_idx}")
 
-    def _channel_wall_sdf(self, px: torch.Tensor, py: torch.Tensor, eps: torch.Tensor) -> torch.Tensor:
+    def _channel_wall_sdf(
+        self, px: torch.Tensor, py: torch.Tensor, eps: torch.Tensor
+    ) -> torch.Tensor:
         x_transition = self.l_total - self.h
         frac = torch.clamp((px - x_transition) / self.h, 0.0, 1.0)
         h_local = self.h * (1.0 + eps * frac)
@@ -166,10 +188,16 @@ class DifferentiableShapeRenderer(nn.Module):
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         pred_mask = self.render(shape_pred, dy_pred, eps_pred)
         target_mask = self.render(shape_target, dy_target, eps_target)
-        loss = self.soft_dice_loss(pred_mask, target_mask) if metric == "dice" else self.soft_iou_loss(pred_mask, target_mask)
+        loss = (
+            self.soft_dice_loss(pred_mask, target_mask)
+            if metric == "dice"
+            else self.soft_iou_loss(pred_mask, target_mask)
+        )
         return loss, pred_mask, target_mask
 
-    def eval_soft_metrics(self, pred_mask: torch.Tensor, target_mask: torch.Tensor) -> dict[str, float]:
+    def eval_soft_metrics(
+        self, pred_mask: torch.Tensor, target_mask: torch.Tensor
+    ) -> dict[str, float]:
         # Binarize the full-geometry occupancy so self-check = 1.0 and metrics
         # remain easy to interpret.
         pred_bin = (pred_mask > 0.5).float()
@@ -180,5 +208,7 @@ class DifferentiableShapeRenderer(nn.Module):
         union = pred_sum + target_sum - intersection + 1e-8
         return {
             "soft_iou": float((intersection / union).detach().cpu()),
-            "soft_dice": float(((2.0 * intersection) / (pred_sum + target_sum + 1e-8)).detach().cpu()),
+            "soft_dice": float(
+                ((2.0 * intersection) / (pred_sum + target_sum + 1e-8)).detach().cpu()
+            ),
         }

@@ -11,7 +11,9 @@ from sim.logging_utils import setup_logger
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Extract fixed-length features from raw probe signals")
+    parser = argparse.ArgumentParser(
+        description="Extract fixed-length features from raw probe signals"
+    )
     parser.add_argument("--config", default="configs/default.yaml", help="Path to YAML config")
     return parser.parse_args()
 
@@ -25,7 +27,9 @@ def main() -> None:
 
     manifest_path = root / "data" / "raw" / "manifest.csv"
     if not manifest_path.exists():
-        raise FileNotFoundError(f"Manifest not found: {manifest_path}. Run dataset generation first.")
+        raise FileNotFoundError(
+            f"Manifest not found: {manifest_path}. Run dataset generation first."
+        )
 
     manifest = pd.read_csv(manifest_path)
     ok_cases = manifest[manifest["status"] == "success"].copy()
@@ -49,7 +53,9 @@ def main() -> None:
 
         df = pd.read_csv(raw_csv)
         try:
-            feature_values = extract_features_from_df(df, n_bands=n_bands, pod_modes=pod_modes, add_pod=add_pod)
+            feature_values = extract_features_from_df(
+                df, n_bands=n_bands, pod_modes=pod_modes, add_pod=add_pod
+            )
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning("Feature extraction failed for %s: %s", case_id, exc)
             continue
@@ -74,7 +80,12 @@ def main() -> None:
     output_csv = feat_dir / "features.csv"
     features_df.to_csv(output_csv, index=False)
 
-    logger.info("Feature extraction complete. rows=%d cols=%d -> %s", features_df.shape[0], features_df.shape[1], output_csv)
+    logger.info(
+        "Feature extraction complete. rows=%d cols=%d -> %s",
+        features_df.shape[0],
+        features_df.shape[1],
+        output_csv,
+    )
 
 
 if __name__ == "__main__":

@@ -17,10 +17,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from ml.reconstruct import predict_reconstruction_images  # noqa: E402
 from sim.config import load_config, repo_root  # noqa: E402
 from sim.geometry_mask import render_case_image  # noqa: E402
-from ml.reconstruct import predict_reconstruction_images  # noqa: E402
-
 
 META_COLS = ["case_id", "shape", "Re", "dy", "eps", "seed"]
 
@@ -44,7 +43,9 @@ def _compute_stratified_test_n(n_total: int, n_strata: int, requested_ratio: flo
     return min(max(requested_test_n, min_test_n), max_test_n)
 
 
-def _get_holdout_indices(strata: np.ndarray, test_n: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
+def _get_holdout_indices(
+    strata: np.ndarray, test_n: int, seed: int
+) -> tuple[np.ndarray, np.ndarray]:
     idx = np.arange(strata.shape[0])
     idx_train, idx_test = train_test_split(
         idx,
@@ -129,7 +130,9 @@ def main() -> None:
     test_ratio = float(cfg["ml"].get("test_size", 0.2))
     n_total = int(features_df.shape[0])
     n_strata = int(np.unique(strata).size)
-    test_n = _compute_stratified_test_n(n_total=n_total, n_strata=n_strata, requested_ratio=test_ratio)
+    test_n = _compute_stratified_test_n(
+        n_total=n_total, n_strata=n_strata, requested_ratio=test_ratio
+    )
 
     idx_train, idx_test = _get_holdout_indices(strata=strata, test_n=test_n, seed=random_state)
 
@@ -303,7 +306,9 @@ def main() -> None:
     ax_d.set_xlabel("|eps|")
     ax_d.set_ylabel("IoU")
     ax_d.set_ylim(0.0, 1.05)
-    ax_d.set_title(f"D. Reconstruction Robustness (IoU={rec_iou_mean:.3f}, Dice={rec_dice_mean:.3f})")
+    ax_d.set_title(
+        f"D. Reconstruction Robustness (IoU={rec_iou_mean:.3f}, Dice={rec_dice_mean:.3f})"
+    )
     ax_d.grid(alpha=0.25)
 
     commit_short = _get_commit_short(root)

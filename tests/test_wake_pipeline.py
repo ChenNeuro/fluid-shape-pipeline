@@ -15,7 +15,6 @@ import yaml
 
 from vision.wake_field_builder import build_distance_crop_box
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SMOKE_CONFIG = REPO_ROOT / "configs" / "wake_field_smoke.yaml"
 
@@ -65,7 +64,9 @@ class WakePipelineSmokeTest(unittest.TestCase):
             self.assertEqual(int(field_payload["field_raw"].shape[0]), len(expected_channels))
             self.assertEqual(int(field_payload["crops"].shape[0]), len(expected_scales))
             self.assertEqual(int(field_payload["crops"].shape[1]), len(expected_channels))
-            self.assertEqual([str(item) for item in field_payload["scales"].tolist()], expected_scales)
+            self.assertEqual(
+                [str(item) for item in field_payload["scales"].tolist()], expected_scales
+            )
 
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
             self.assertIn("field_channels", metadata)
@@ -81,16 +82,22 @@ class WakePipelineSmokeTest(unittest.TestCase):
             model_names = {path.name for path in (temp_root / "models").iterdir()}
             self.assertEqual(model_names, {"wake_field_main.pt", "wake_field_single.pt"})
 
-            selection_payload = json.loads((temp_root / "reports" / "wake_field_selection.json").read_text(encoding="utf-8"))
+            selection_payload = json.loads(
+                (temp_root / "reports" / "wake_field_selection.json").read_text(encoding="utf-8")
+            )
             self.assertEqual(selection_payload["main_variant"], "dist_multi_4ch")
             self.assertIsNone(selection_payload["speed_variant"])
 
-            summary_text = (temp_root / "reports" / "wake_field_summary.md").read_text(encoding="utf-8")
+            summary_text = (temp_root / "reports" / "wake_field_summary.md").read_text(
+                encoding="utf-8"
+            )
             self.assertIn("dist_single_4ch", summary_text)
             self.assertNotIn("dist_only_4ch", summary_text)
 
             self.assertTrue((temp_root / "reports" / "wake_field_summary.md").exists())
-            self.assertTrue((temp_root / "reports" / "wake_field_reconstruction_summary.md").exists())
+            self.assertTrue(
+                (temp_root / "reports" / "wake_field_reconstruction_summary.md").exists()
+            )
 
     def test_distance_crop_uses_physical_channel_height(self) -> None:
         box_ref = build_distance_crop_box(
@@ -115,8 +122,7 @@ class WakePipelineSmokeTest(unittest.TestCase):
         self.assertEqual(box_ref[1:], box_padded[1:])
 
     def test_lazy_resnet_entrypoints_do_not_import_vit_dependencies(self) -> None:
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
             import builtins
 
             real_import = builtins.__import__
@@ -134,8 +140,7 @@ class WakePipelineSmokeTest(unittest.TestCase):
             import ml.reconstruct_wake
 
             print("ok")
-            """
-        )
+            """)
         completed = subprocess.run(
             [sys.executable, "-c", code],
             cwd=REPO_ROOT,

@@ -12,20 +12,24 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 
 from ml.reconstruct import (
+    _clip_params,
     _compute_stratified_test_n,
     _evaluate_prediction,
     _prepare_xy,
     _render_from_predicted_params,
-    _clip_params,
 )
 from sim.config import load_config, repo_root
 from sim.logging_utils import setup_logger
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Audit possible pattern-matching shortcuts in reconstruction")
+    parser = argparse.ArgumentParser(
+        description="Audit possible pattern-matching shortcuts in reconstruction"
+    )
     parser.add_argument("--config", default="configs/default.yaml", help="Path to YAML config")
-    parser.add_argument("--n_perm", type=int, default=30, help="Number of target-permutation trials")
+    parser.add_argument(
+        "--n_perm", type=int, default=30, help="Number of target-permutation trials"
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed for audit")
     return parser.parse_args()
 
@@ -86,7 +90,9 @@ def _fit_predict_parametric(
     }
 
 
-def _random_pair_metrics(y_true: np.ndarray, y_pred: np.ndarray, threshold: float, seed: int = 123) -> dict[str, float]:
+def _random_pair_metrics(
+    y_true: np.ndarray, y_pred: np.ndarray, threshold: float, seed: int = 123
+) -> dict[str, float]:
     rng = np.random.default_rng(seed)
     perm = rng.permutation(y_true.shape[0])
     return _evaluate_prediction(y_true=y_true[perm], y_pred=y_pred, threshold=threshold)
@@ -117,7 +123,9 @@ def _nearest_neighbor_baseline(
     return metrics, dists
 
 
-def _plot_null_distribution(null_df: pd.DataFrame, observed_iou: float, nn_iou: float, output_path: Path) -> None:
+def _plot_null_distribution(
+    null_df: pd.DataFrame, observed_iou: float, nn_iou: float, output_path: Path
+) -> None:
     fig, ax = plt.subplots(figsize=(7.6, 4.8))
     ax.hist(null_df["iou"], bins=16, alpha=0.7, color="#93c5fd", edgecolor="#1e3a8a")
     ax.axvline(observed_iou, color="#16a34a", lw=2.2, label=f"observed={observed_iou:.3f}")
@@ -168,15 +176,25 @@ def _write_report(
     )
     lines.append("")
     lines.append("## Duplicate-Like Risk")
-    lines.append(f"- Near-duplicate rate (scaled NN dist < 1e-9): {nn_metrics['dup_like_rate']:.6f}")
+    lines.append(
+        f"- Near-duplicate rate (scaled NN dist < 1e-9): {nn_metrics['dup_like_rate']:.6f}"
+    )
     lines.append(f"- NN distance mean: {nn_metrics['nn_dist_mean']:.6f}")
     lines.append(f"- NN distance p05: {nn_metrics['nn_dist_p05']:.6f}")
     lines.append("")
     lines.append("## Conclusion")
-    if p_iou < 0.01 and observed["iou"] > nn_metrics["iou"] and observed["iou"] > random_pair["iou"]:
-        lines.append("- Current evidence rejects pure template pattern-matching as the primary explanation.")
+    if (
+        p_iou < 0.01
+        and observed["iou"] > nn_metrics["iou"]
+        and observed["iou"] > random_pair["iou"]
+    ):
+        lines.append(
+            "- Current evidence rejects pure template pattern-matching as the primary explanation."
+        )
     else:
-        lines.append("- Shortcut risk remains non-negligible; strengthen controls or expand OOD tests.")
+        lines.append(
+            "- Shortcut risk remains non-negligible; strengthen controls or expand OOD tests."
+        )
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -188,7 +206,9 @@ def main() -> None:
 
     features_path = root / "data" / "features" / "features.csv"
     if not features_path.exists():
-        raise FileNotFoundError(f"Missing {features_path}. Run dataset and feature extraction first.")
+        raise FileNotFoundError(
+            f"Missing {features_path}. Run dataset and feature extraction first."
+        )
 
     features_df = pd.read_csv(features_path)
     if features_df.empty:
@@ -201,14 +221,16 @@ def main() -> None:
         requested_ratio=float(cfg["ml"].get("test_size", 0.2)),
     )
 
-    x_train, x_test, y_shape_train, y_shape_test, y_params_train, y_params_test, y_train, y_test = train_test_split(
-        x,
-        y_shape,
-        y_params,
-        y_flat,
-        test_size=test_n,
-        random_state=int(args.seed),
-        stratify=strata,
+    x_train, x_test, y_shape_train, y_shape_test, y_params_train, y_params_test, y_train, y_test = (
+        train_test_split(
+            x,
+            y_shape,
+            y_params,
+            y_flat,
+            test_size=test_n,
+            random_state=int(args.seed),
+            stratify=strata,
+        )
     )
 
     threshold = float(cfg["reconstruction"].get("obstacle_threshold", 0.8))
@@ -222,7 +244,9 @@ def main() -> None:
         seed=int(args.seed),
     )
     observed = _evaluate_prediction(y_true=y_test, y_pred=y_pred, threshold=threshold)
-    random_pair = _random_pair_metrics(y_true=y_test, y_pred=y_pred, threshold=threshold, seed=int(args.seed) + 1)
+    random_pair = _random_pair_metrics(
+        y_true=y_test, y_pred=y_pred, threshold=threshold, seed=int(args.seed) + 1
+    )
     nn_metrics, nn_dists = _nearest_neighbor_baseline(
         x_train=x_train,
         y_train=y_train,
@@ -258,8 +282,12 @@ def main() -> None:
         logger.info("Permutation %d/%d done. iou=%.4f", i + 1, int(args.n_perm), float(m["iou"]))
 
     null_df = pd.DataFrame(null_rows)
-    p_iou = float((1.0 + np.sum(null_df["iou"].to_numpy() >= observed["iou"])) / (len(null_df) + 1.0))
-    p_miou3 = float((1.0 + np.sum(null_df["miou3"].to_numpy() >= observed["miou3"])) / (len(null_df) + 1.0))
+    p_iou = float(
+        (1.0 + np.sum(null_df["iou"].to_numpy() >= observed["iou"])) / (len(null_df) + 1.0)
+    )
+    p_miou3 = float(
+        (1.0 + np.sum(null_df["miou3"].to_numpy() >= observed["miou3"])) / (len(null_df) + 1.0)
+    )
 
     reports_dir = root / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)

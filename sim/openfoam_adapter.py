@@ -30,7 +30,9 @@ class OpenFOAMSimulator:
         self.x_probe = self.l_in + self.l_out
 
     def _required_commands(self) -> list[str]:
-        cmds = list(self.of_cfg.get("mesh_cmds", [])) + [self.of_cfg.get("solver_cmd", "pimpleFoam")]
+        cmds = list(self.of_cfg.get("mesh_cmds", [])) + [
+            self.of_cfg.get("solver_cmd", "pimpleFoam")
+        ]
         return [cmd for cmd in cmds if cmd]
 
     def _check_openfoam_commands(self) -> None:
@@ -73,7 +75,10 @@ class OpenFOAMSimulator:
         nu = u_mean * d / float(case_spec.re)
 
         replacements = {
-            "__END_TIME__": str(float(self.sim_cfg["time"]["transient_time"]) + float(self.sim_cfg["time"]["min_samples"]) * float(self.sim_cfg["time"]["dt"])),
+            "__END_TIME__": str(
+                float(self.sim_cfg["time"]["transient_time"])
+                + float(self.sim_cfg["time"]["min_samples"]) * float(self.sim_cfg["time"]["dt"])
+            ),
             "__DELTA_T__": str(float(self.sim_cfg["time"]["dt"])),
             "__WRITE_INTERVAL__": str(float(self.of_cfg.get("write_interval", 0.1))),
             "__PROBE_POINTS__": self._probe_block(),

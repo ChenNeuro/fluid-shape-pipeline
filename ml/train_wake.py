@@ -29,8 +29,12 @@ from vision.wake_model import MultiScaleWakeNet, compute_multitask_loss, select_
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train multi-scale wake-field classifiers and export comparison reports")
-    parser.add_argument("--config", default="configs/wake_field_450.yaml", help="Path to YAML config")
+    parser = argparse.ArgumentParser(
+        description="Train multi-scale wake-field classifiers and export comparison reports"
+    )
+    parser.add_argument(
+        "--config", default="configs/wake_field_450.yaml", help="Path to YAML config"
+    )
     parser.add_argument(
         "--backbone",
         default="resnet18",
@@ -47,7 +51,9 @@ def set_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
-def _tensor_loader(x: np.ndarray, shape_idx: np.ndarray, params: np.ndarray, re_idx: np.ndarray, batch_size: int) -> DataLoader:
+def _tensor_loader(
+    x: np.ndarray, shape_idx: np.ndarray, params: np.ndarray, re_idx: np.ndarray, batch_size: int
+) -> DataLoader:
     dataset = TensorDataset(
         torch.from_numpy(x).float(),
         torch.from_numpy(shape_idx).long(),
@@ -57,7 +63,9 @@ def _tensor_loader(x: np.ndarray, shape_idx: np.ndarray, params: np.ndarray, re_
     return DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 
-def _predict(model: torch.nn.Module, x: np.ndarray, *, batch_size: int, device: torch.device) -> dict[str, np.ndarray]:
+def _predict(
+    model: torch.nn.Module, x: np.ndarray, *, batch_size: int, device: torch.device
+) -> dict[str, np.ndarray]:
     dataset = TensorDataset(torch.from_numpy(x).float())
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
@@ -109,7 +117,9 @@ def _train_model(
         dropout=dropout,
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-    loader = _tensor_loader(x_train, shape_train_idx, params_train, re_train_idx, batch_size=batch_size)
+    loader = _tensor_loader(
+        x_train, shape_train_idx, params_train, re_train_idx, batch_size=batch_size
+    )
 
     history: list[dict[str, float]] = []
     for epoch in range(epochs):
@@ -194,7 +204,9 @@ def _train_vit_model(
         pretrained=True,
     ).to(device)
 
-    loader = _tensor_loader(x_train, shape_train_idx, params_train, re_train_idx, batch_size=batch_size)
+    loader = _tensor_loader(
+        x_train, shape_train_idx, params_train, re_train_idx, batch_size=batch_size
+    )
     history: list[dict[str, float]] = []
 
     model.freeze_backbone()
@@ -303,7 +315,9 @@ def _save_model_pack(
             "in_channels": int(x_shape[2]),
             "n_shapes": len(shape_labels),
             "n_re_classes": len(re_values),
-            "fusion_hidden": int(cfg.get("vision", {}).get("training", {}).get("fusion_hidden", 256)),
+            "fusion_hidden": int(
+                cfg.get("vision", {}).get("training", {}).get("fusion_hidden", 256)
+            ),
             "dropout": float(cfg.get("vision", {}).get("training", {}).get("dropout", 0.15)),
         }
     else:
@@ -313,7 +327,9 @@ def _save_model_pack(
             "n_shapes": len(shape_labels),
             "n_re_classes": len(re_values),
             "proj_dim": int(cfg.get("vision", {}).get("mae_vit", {}).get("proj_dim", 512)),
-            "fusion_hidden": int(cfg.get("vision", {}).get("mae_vit", {}).get("fusion_hidden", 512)),
+            "fusion_hidden": int(
+                cfg.get("vision", {}).get("mae_vit", {}).get("fusion_hidden", 512)
+            ),
             "dropout": float(cfg.get("vision", {}).get("mae_vit", {}).get("dropout", 0.2)),
         }
     payload = {
@@ -440,7 +456,9 @@ def main() -> None:
     label_maps = build_label_maps(bundle)
     strata = stratification_labels(bundle)
     ml_cfg = cfg["ml"]
-    test_n = compute_stratified_test_n(bundle.case_ids.shape[0], len(np.unique(strata)), float(ml_cfg.get("test_size", 0.2)))
+    test_n = compute_stratified_test_n(
+        bundle.case_ids.shape[0], len(np.unique(strata)), float(ml_cfg.get("test_size", 0.2))
+    )
     repeat_seeds = [int(seed) for seed in ml_cfg.get("repeat_seeds", [42])]
     export_seed = int(cfg.get("vision", {}).get("training", {}).get("export_seed", repeat_seeds[0]))
     if export_seed not in repeat_seeds:
@@ -464,9 +482,17 @@ def main() -> None:
 
         for seed in repeat_seeds:
             idx_train, idx_test = repeated_holdout_split(strata, test_n=test_n, seed=seed)
-            shape_train_idx = np.asarray([label_maps.shape_to_idx[value] for value in bundle.shapes[idx_train]], dtype=np.int64)
-            re_train_idx = np.asarray([label_maps.re_to_idx[int(value)] for value in bundle.re_values[idx_train]], dtype=np.int64)
-            params_train = np.stack([bundle.dy[idx_train], bundle.eps[idx_train]], axis=1).astype(np.float32)
+            shape_train_idx = np.asarray(
+                [label_maps.shape_to_idx[value] for value in bundle.shapes[idx_train]],
+                dtype=np.int64,
+            )
+            re_train_idx = np.asarray(
+                [label_maps.re_to_idx[int(value)] for value in bundle.re_values[idx_train]],
+                dtype=np.int64,
+            )
+            params_train = np.stack([bundle.dy[idx_train], bundle.eps[idx_train]], axis=1).astype(
+                np.float32
+            )
 
             if args.backbone == "mae_vit":
                 model, history = _train_vit_model(
@@ -499,9 +525,13 @@ def main() -> None:
             pred = _predict(model, x_all[idx_test], batch_size=batch_size, device=device)
             shape_pred_idx = np.argmax(pred["shape_logits"], axis=1)
             re_pred_idx = np.argmax(pred["re_logits"], axis=1)
-            shape_pred = np.asarray([label_maps.idx_to_shape[int(idx)] for idx in shape_pred_idx], dtype=object)
+            shape_pred = np.asarray(
+                [label_maps.idx_to_shape[int(idx)] for idx in shape_pred_idx], dtype=object
+            )
 
-            dy_pred, eps_pred = clip_params(pred["params_pred"][:, 0], pred["params_pred"][:, 1], cfg)
+            dy_pred, eps_pred = clip_params(
+                pred["params_pred"][:, 0], pred["params_pred"][:, 1], cfg
+            )
             dy_true = bundle.dy[idx_test].astype(np.float32)
             eps_true = bundle.eps[idx_test].astype(np.float32)
             targets = render_targets(
@@ -525,7 +555,10 @@ def main() -> None:
             re_acc = float(
                 np.mean(
                     re_pred_idx
-                    == np.asarray([label_maps.re_to_idx[int(value)] for value in bundle.re_values[idx_test]], dtype=int)
+                    == np.asarray(
+                        [label_maps.re_to_idx[int(value)] for value in bundle.re_values[idx_test]],
+                        dtype=int,
+                    )
                 )
             )
 
@@ -552,7 +585,9 @@ def main() -> None:
                     model_type=args.backbone,
                     variant_name=variant_name,
                     x_shape=x_all.shape,
-                    shape_labels=[label_maps.idx_to_shape[idx] for idx in sorted(label_maps.idx_to_shape)],
+                    shape_labels=[
+                        label_maps.idx_to_shape[idx] for idx in sorted(label_maps.idx_to_shape)
+                    ],
                     re_values=[label_maps.idx_to_re[idx] for idx in sorted(label_maps.idx_to_re)],
                     test_case_ids=bundle.case_ids[idx_test].tolist(),
                     cfg=cfg,
@@ -567,7 +602,9 @@ def main() -> None:
                     model_type=args.backbone,
                     variant_name=variant_name,
                     x_shape=x_all.shape,
-                    shape_labels=[label_maps.idx_to_shape[idx] for idx in sorted(label_maps.idx_to_shape)],
+                    shape_labels=[
+                        label_maps.idx_to_shape[idx] for idx in sorted(label_maps.idx_to_shape)
+                    ],
                     re_values=[label_maps.idx_to_re[idx] for idx in sorted(label_maps.idx_to_re)],
                     test_case_ids=bundle.case_ids[idx_test].tolist(),
                     cfg=cfg,
@@ -577,7 +614,9 @@ def main() -> None:
                 _plot_confusion_matrix(
                     y_true=bundle.shapes[idx_test],
                     y_pred=shape_pred,
-                    labels=[label_maps.idx_to_shape[idx] for idx in sorted(label_maps.idx_to_shape)],
+                    labels=[
+                        label_maps.idx_to_shape[idx] for idx in sorted(label_maps.idx_to_shape)
+                    ],
                     output_path=reports_dir / "wake_field_confusion_matrix.png",
                 )
 
@@ -612,7 +651,9 @@ def main() -> None:
     summary_df.to_csv(reports_dir / "wake_field_variant_summary.csv", index=False)
 
     _plot_variant_summary(summary_df, reports_dir / "wake_field_variant_comparison.png")
-    _plot_training_curves(histories_for_plot, reports_dir / "wake_field_training_curves.png", export_seed=export_seed)
+    _plot_training_curves(
+        histories_for_plot, reports_dir / "wake_field_training_curves.png", export_seed=export_seed
+    )
 
     main_spec = VARIANTS[main_variant]
     x_main = variant_tensor(bundle, scales=main_spec["scales"], channels=main_spec["channels"])
@@ -624,9 +665,17 @@ def main() -> None:
         if args.backbone == "mae_vit":
             model, _ = _train_vit_model(
                 x_train=x_main[idx_train],
-                shape_train_idx=np.asarray([label_maps.shape_to_idx[value] for value in bundle.shapes[idx_train]], dtype=np.int64),
-                params_train=np.stack([bundle.dy[idx_train], bundle.eps[idx_train]], axis=1).astype(np.float32),
-                re_train_idx=np.asarray([label_maps.re_to_idx[int(value)] for value in bundle.re_values[idx_train]], dtype=np.int64),
+                shape_train_idx=np.asarray(
+                    [label_maps.shape_to_idx[value] for value in bundle.shapes[idx_train]],
+                    dtype=np.int64,
+                ),
+                params_train=np.stack([bundle.dy[idx_train], bundle.eps[idx_train]], axis=1).astype(
+                    np.float32
+                ),
+                re_train_idx=np.asarray(
+                    [label_maps.re_to_idx[int(value)] for value in bundle.re_values[idx_train]],
+                    dtype=np.int64,
+                ),
                 cfg=cfg,
                 seed=1000 + int(re_test),
                 n_shapes=len(label_maps.shape_to_idx),
@@ -636,9 +685,17 @@ def main() -> None:
         else:
             model, _ = _train_model(
                 x_train=x_main[idx_train],
-                shape_train_idx=np.asarray([label_maps.shape_to_idx[value] for value in bundle.shapes[idx_train]], dtype=np.int64),
-                params_train=np.stack([bundle.dy[idx_train], bundle.eps[idx_train]], axis=1).astype(np.float32),
-                re_train_idx=np.asarray([label_maps.re_to_idx[int(value)] for value in bundle.re_values[idx_train]], dtype=np.int64),
+                shape_train_idx=np.asarray(
+                    [label_maps.shape_to_idx[value] for value in bundle.shapes[idx_train]],
+                    dtype=np.int64,
+                ),
+                params_train=np.stack([bundle.dy[idx_train], bundle.eps[idx_train]], axis=1).astype(
+                    np.float32
+                ),
+                re_train_idx=np.asarray(
+                    [label_maps.re_to_idx[int(value)] for value in bundle.re_values[idx_train]],
+                    dtype=np.int64,
+                ),
                 cfg=cfg,
                 seed=1000 + int(re_test),
                 n_shapes=len(label_maps.shape_to_idx),
@@ -646,11 +703,25 @@ def main() -> None:
                 device=device,
             )
         pred = _predict(model, x_main[idx_test], batch_size=batch_size, device=device)
-        shape_pred = np.asarray([label_maps.idx_to_shape[int(idx)] for idx in np.argmax(pred["shape_logits"], axis=1)], dtype=object)
+        shape_pred = np.asarray(
+            [label_maps.idx_to_shape[int(idx)] for idx in np.argmax(pred["shape_logits"], axis=1)],
+            dtype=object,
+        )
         dy_pred, eps_pred = clip_params(pred["params_pred"][:, 0], pred["params_pred"][:, 1], cfg)
-        targets = render_targets(shapes=bundle.shapes[idx_test], dy_values=bundle.dy[idx_test], eps_values=bundle.eps[idx_test], cfg=cfg)
-        predictions = render_targets(shapes=shape_pred, dy_values=dy_pred, eps_values=eps_pred, cfg=cfg)
-        inv_metrics = obstacle_iou_and_dice(targets, predictions, threshold=float(cfg["reconstruction"].get("obstacle_threshold", 0.8)))
+        targets = render_targets(
+            shapes=bundle.shapes[idx_test],
+            dy_values=bundle.dy[idx_test],
+            eps_values=bundle.eps[idx_test],
+            cfg=cfg,
+        )
+        predictions = render_targets(
+            shapes=shape_pred, dy_values=dy_pred, eps_values=eps_pred, cfg=cfg
+        )
+        inv_metrics = obstacle_iou_and_dice(
+            targets,
+            predictions,
+            threshold=float(cfg["reconstruction"].get("obstacle_threshold", 0.8)),
+        )
         cls_metrics = accuracy_f1(bundle.shapes[idx_test], shape_pred)
 
         leave_rows.append(
@@ -690,7 +761,9 @@ def main() -> None:
         "repeat_seeds": repeat_seeds,
         "test_size": int(test_n),
     }
-    (reports_dir / "wake_field_selection.json").write_text(json.dumps(selection_payload, indent=2), encoding="utf-8")
+    (reports_dir / "wake_field_selection.json").write_text(
+        json.dumps(selection_payload, indent=2), encoding="utf-8"
+    )
 
     logger.info(
         "Wake-field training complete. main_variant=%s summary=%s",

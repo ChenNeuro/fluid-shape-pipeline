@@ -23,7 +23,9 @@ class TestMAEViTForward:
         assert out1.shape == out2.shape == (2, 768)
 
     def test_multiscale_vit_output_shapes(self):
-        model = MultiScaleViTWakeNet(n_scales=4, in_channels=4, n_shapes=5, n_re_classes=3, pretrained=False)
+        model = MultiScaleViTWakeNet(
+            n_scales=4, in_channels=4, n_shapes=5, n_re_classes=3, pretrained=False
+        )
         x = torch.randn(4, 4, 4, 128, 128)
         out = model(x)
         assert out["shape_logits"].shape == (4, 5)
@@ -31,19 +33,25 @@ class TestMAEViTForward:
         assert out["re_logits"].shape == (4, 3)
 
     def test_multiscale_vit_single_scale(self):
-        model = MultiScaleViTWakeNet(n_scales=1, in_channels=4, n_shapes=5, n_re_classes=3, pretrained=False)
+        model = MultiScaleViTWakeNet(
+            n_scales=1, in_channels=4, n_shapes=5, n_re_classes=3, pretrained=False
+        )
         x = torch.randn(4, 1, 4, 128, 128)
         out = model(x)
         assert out["shape_logits"].shape == (4, 5)
 
     def test_freeze_backbone(self):
-        model = MultiScaleViTWakeNet(n_scales=4, in_channels=4, n_shapes=5, n_re_classes=3, pretrained=False)
+        model = MultiScaleViTWakeNet(
+            n_scales=4, in_channels=4, n_shapes=5, n_re_classes=3, pretrained=False
+        )
         assert all(p.requires_grad for p in model.encoder.parameters())
         model.freeze_backbone()
         assert not any(p.requires_grad for p in model.encoder.parameters())
 
     def test_unfreeze_with_llrd(self):
-        model = MultiScaleViTWakeNet(n_scales=4, in_channels=4, n_shapes=5, n_re_classes=3, pretrained=False)
+        model = MultiScaleViTWakeNet(
+            n_scales=4, in_channels=4, n_shapes=5, n_re_classes=3, pretrained=False
+        )
         groups = model.unfreeze_with_llrd(base_lr=1e-4, llrd_decay=0.85)
         lrs = [g["lr"] for g in groups if g["params"]]
         assert len(lrs) > 0
@@ -60,7 +68,9 @@ class TestDiffRenderer:
         loss, pred, target = renderer.render_and_loss(shape_idx, dy, eps, shape_idx, dy, eps)
         assert pred.shape == target.shape == (1, 1, 128, 128)
         assert 0.0 <= float(pred.min()) <= float(pred.max()) <= 1.0
-        assert float(pred.max()) > 0.9, f"Circle mask should reach near 1.0, got {float(pred.max())}"
+        assert (
+            float(pred.max()) > 0.9
+        ), f"Circle mask should reach near 1.0, got {float(pred.max())}"
         assert float(loss) < 0.5, f"Loss = 1-Dice, expect ~0.27, got {float(loss)}"
 
     def test_airfoil_render_produces_valid_mask(self):
@@ -71,7 +81,9 @@ class TestDiffRenderer:
         eps = torch.tensor([0.0])
         loss, pred, target = renderer.render_and_loss(shape_idx, dy, eps, shape_idx, dy, eps)
         assert 0.0 <= float(pred.min()) <= float(pred.max()) <= 1.0
-        assert float(pred.max()) > 0.8, f"Airfoil mask should reach near 1.0, got {float(pred.max())}"
+        assert (
+            float(pred.max()) > 0.8
+        ), f"Airfoil mask should reach near 1.0, got {float(pred.max())}"
 
     def test_all_five_shapes_render(self):
         renderer = DifferentiableShapeRenderer(image_size=128, transition_px=1)
@@ -82,7 +94,9 @@ class TestDiffRenderer:
         assert masks.shape == (5, 1, 128, 128)
         assert 0.0 <= float(masks.min()) <= float(masks.max()) <= 1.0
         for i in range(5):
-            assert float(masks[i].max()) > 0.5, f"Shape {i} mask should reach >0.5 (got max={float(masks[i].max()):.4f})"
+            assert (
+                float(masks[i].max()) > 0.5
+            ), f"Shape {i} mask should reach >0.5 (got max={float(masks[i].max()):.4f})"
 
     def test_different_shapes_produce_different_masks(self):
         renderer = DifferentiableShapeRenderer(image_size=128, transition_px=1)
@@ -118,14 +132,18 @@ class TestDiffRenderer:
         assert pred_mask.shape == (2, 1, 128, 128)
         assert float(loss.detach()) > 0.001, "Mismatched params should produce non-zero loss"
         loss.backward()
-        assert dy_pred.grad is not None and dy_pred.grad.abs().sum() > 0, "dy gradient should be non-zero when masks differ"
+        assert (
+            dy_pred.grad is not None and dy_pred.grad.abs().sum() > 0
+        ), "dy gradient should be non-zero when masks differ"
 
     def test_eval_mode_produces_sharp_masks(self):
         renderer = DifferentiableShapeRenderer(image_size=64, transition_px=1)
         renderer.eval()
         shape_idx = torch.tensor([0])
         mask = renderer.render(shape_idx, torch.zeros(1), torch.zeros(1))
-        assert float(mask.max()) > 0.9, f"Circle mask should be nearly binary, got max={float(mask.max())}"
+        assert (
+            float(mask.max()) > 0.9
+        ), f"Circle mask should be nearly binary, got max={float(mask.max())}"
 
     def test_soft_dice_loss_bounded(self):
         renderer = DifferentiableShapeRenderer(image_size=32, transition_px=2)

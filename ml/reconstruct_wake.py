@@ -8,7 +8,14 @@ import numpy as np
 import pandas as pd
 import torch
 
-from ml.wake_common import accuracy_f1, build_label_maps, clip_params, obstacle_iou_and_dice, render_targets, VARIANTS
+from ml.wake_common import (
+    VARIANTS,
+    accuracy_f1,
+    build_label_maps,
+    clip_params,
+    obstacle_iou_and_dice,
+    render_targets,
+)
 from sim.config import load_config, repo_root
 from sim.logging_utils import setup_logger
 from vision.diff_renderer import DifferentiableShapeRenderer
@@ -17,12 +24,18 @@ from vision.wake_model import MultiScaleWakeNet, select_device
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Evaluate canonical inverse reconstruction from wake-field predictions")
-    parser.add_argument("--config", default="configs/wake_field_450.yaml", help="Path to YAML config")
+    parser = argparse.ArgumentParser(
+        description="Evaluate canonical inverse reconstruction from wake-field predictions"
+    )
+    parser.add_argument(
+        "--config", default="configs/wake_field_450.yaml", help="Path to YAML config"
+    )
     return parser.parse_args()
 
 
-def _predict(model: torch.nn.Module, x: np.ndarray, *, batch_size: int, device: torch.device) -> dict[str, np.ndarray]:
+def _predict(
+    model: torch.nn.Module, x: np.ndarray, *, batch_size: int, device: torch.device
+) -> dict[str, np.ndarray]:
     dataset = torch.utils.data.TensorDataset(torch.from_numpy(x).float())
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
@@ -110,7 +123,9 @@ def main() -> None:
 
     model_path = root / "models" / "wake_field_main.pt"
     if not model_path.exists():
-        raise FileNotFoundError(f"Missing wake-field model pack: {model_path}. Run ml.train_wake first.")
+        raise FileNotFoundError(
+            f"Missing wake-field model pack: {model_path}. Run ml.train_wake first."
+        )
 
     bundle = load_wake_bundle()
     label_maps = build_label_maps(bundle)
@@ -163,7 +178,9 @@ def main() -> None:
 
     targets = render_targets(shapes=shapes_true, dy_values=dy_true, eps_values=eps_true, cfg=cfg)
     predictions = render_targets(shapes=shape_pred, dy_values=dy_pred, eps_values=eps_pred, cfg=cfg)
-    sanity_predictions = render_targets(shapes=shapes_true, dy_values=dy_true, eps_values=eps_true, cfg=cfg)
+    sanity_predictions = render_targets(
+        shapes=shapes_true, dy_values=dy_true, eps_values=eps_true, cfg=cfg
+    )
 
     threshold = float(cfg["reconstruction"].get("obstacle_threshold", 0.8))
     inv_metrics = obstacle_iou_and_dice(targets, predictions, threshold=threshold)
@@ -175,7 +192,9 @@ def main() -> None:
         eps_t = torch.from_numpy(eps_pred.astype(np.float32)).to(device)
         pred_soft = renderer.render(shape_indices, dy_t, eps_t)
 
-        true_shape_idx = np.asarray([label_maps.shape_to_idx[s] for s in shapes_true], dtype=np.int64)
+        true_shape_idx = np.asarray(
+            [label_maps.shape_to_idx[s] for s in shapes_true], dtype=np.int64
+        )
         true_shape_t = torch.from_numpy(true_shape_idx).long().to(device)
         true_dy_t = torch.from_numpy(dy_true.astype(np.float32)).to(device)
         true_eps_t = torch.from_numpy(eps_true.astype(np.float32)).to(device)

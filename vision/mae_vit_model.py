@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import timm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import timm
 
 
 def select_device() -> torch.device:
@@ -42,7 +42,8 @@ class MAEViTEncoder(nn.Module):
             self.backbone = timm.create_model(model_name, pretrained=pretrained, in_chans=3)
             old_proj = self.backbone.patch_embed.proj
             self.backbone.patch_embed.proj = nn.Conv2d(
-                in_channels, old_proj.out_channels,
+                in_channels,
+                old_proj.out_channels,
                 kernel_size=old_proj.kernel_size,
                 stride=old_proj.stride,
                 padding=old_proj.padding,
@@ -184,7 +185,7 @@ class MultiScaleViTWakeNet(nn.Module):
                 add_group(block_params[depth], lr, 0.01)
 
         # Patch embed / pos embed / cls token: lowest LR
-        lowest_lr = base_lr * (llrd_decay ** n_blocks)
+        lowest_lr = base_lr * (llrd_decay**n_blocks)
         add_group(non_block_decay, lowest_lr, 0.01)
         add_group(non_block_no_decay, lowest_lr, 0.0)
 
