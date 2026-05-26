@@ -16,11 +16,12 @@ from ml.wake_common import (
     obstacle_iou_and_dice,
     render_targets,
 )
-from sim.config import load_config, repo_root
+from sim.config import load_config
+from sim.experiment import experiment_paths, write_run_manifest
 from sim.logging_utils import setup_logger
 from vision.diff_renderer import DifferentiableShapeRenderer
 from vision.wake_dataset import load_wake_bundle, variant_tensor
-from vision.wake_model import MultiScaleWakeNet, select_device
+from vision.wake_model import MultiScaleJEPAModel, MultiScaleWakeNet, select_device
 
 
 def parse_args() -> argparse.Namespace:
@@ -29,6 +30,21 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--config", default="configs/wake_field_450.yaml", help="Path to YAML config"
+    )
+    parser.add_argument(
+        "--run-name",
+        default="resnet18",
+        help="Training run name under <run-dir>/models and <run-dir>/reports.",
+    )
+    parser.add_argument(
+        "--run-dir",
+        default=None,
+        help="Experiment output directory. Defaults to runs/<config-name>.",
+    )
+    parser.add_argument(
+        "--model-path",
+        default=None,
+        help="Optional explicit path to a wake_field_main.pt model pack.",
     )
     return parser.parse_args()
 
@@ -118,20 +134,33 @@ def _write_summary(
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
-    root = repo_root()
-    logger = setup_logger("reconstruct_wake", root / "logs" / "reconstruct_wake.log")
+    paths = experiment_paths(cfg, config_path=args.config, run_dir=args.run_dir)
+    write_run_manifest(
+        paths=paths,
+        cfg=cfg,
+        config_path=args.config,
+        stage="reconstruct_wake",
+        extra={"run_name": args.run_name, "model_path": args.model_path},
+    )
+    logger = setup_logger(
+        "reconstruct_wake", paths.logs_dir / f"reconstruct_wake_{args.run_name}.log"
+    )
 
-    model_path = root / "models" / "wake_field_main.pt"
+    model_path = (
+        Path(args.model_path).expanduser().resolve()
+        if args.model_path
+        else paths.models_dir / args.run_name / "wake_field_main.pt"
+    )
     if not model_path.exists():
         raise FileNotFoundError(
             f"Missing wake-field model pack: {model_path}. Run ml.train_wake first."
         )
 
-    bundle = load_wake_bundle()
+    bundle = load_wake_bundle(paths.wake_fields_dir)
     label_maps = build_label_maps(bundle)
     device = select_device()
     batch_size = int(cfg.get("vision", {}).get("training", {}).get("batch_size", 16))
-    reports_dir = root / "reports"
+    reports_dir = paths.reports_dir / args.run_name
     reports_dir.mkdir(parents=True, exist_ok=True)
 
     pack = torch.load(model_path, map_location="cpu", weights_only=False)
@@ -149,6 +178,8 @@ def main() -> None:
         from vision.mae_vit_model import MultiScaleViTWakeNet
 
         model = MultiScaleViTWakeNet(**pack["model_kwargs"]).to(device)
+    elif model_type in ("jepa", "smallcnn", "simsiam"):
+        model = MultiScaleJEPAModel(**pack["model_kwargs"]).to(device)
     else:
         model = MultiScaleWakeNet(**pack["model_kwargs"]).to(device)
     model.load_state_dict(pack["state_dict"])

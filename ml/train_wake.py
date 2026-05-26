@@ -2,14 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import torch
-from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
-from torch.utils.data import DataLoader, TensorDataset
 
 from ml.wake_common import (
     VARIANTS,
@@ -22,10 +17,27 @@ from ml.wake_common import (
     repeated_holdout_split,
     stratification_labels,
 )
-from sim.config import load_config, repo_root
+from ml.wake_reporting import (
+    plot_confusion_matrix,
+    plot_training_curves,
+    plot_variant_summary,
+    write_wake_summary,
+)
+from ml.wake_splits import split_train_val as _split_train_val
+from ml.wake_training import predict_wake_model as _predict
+from ml.wake_training import save_model_pack as _save_model_pack
+from ml.wake_training import set_seed as set_seed  # noqa: F401
+from ml.wake_training import train_jepa_wake_model as _train_jepa_model  # noqa: F401
+from ml.wake_training import train_resnet_wake_model as _train_model  # noqa: F401
+from ml.wake_training import train_simsiam_wake_model as _train_simsiam_model  # noqa: F401
+from ml.wake_training import train_smallcnn_wake_model as _train_smallcnn_model  # noqa: F401
+from ml.wake_training import train_vit_wake_model as _train_vit_model  # noqa: F401
+from ml.wake_training import train_wake_backbone
+from sim.config import load_config
+from sim.experiment import experiment_paths, write_run_manifest
 from sim.logging_utils import setup_logger
-from vision.wake_dataset import load_wake_bundle, variant_tensor
-from vision.wake_model import MultiScaleWakeNet, compute_multitask_loss, select_device
+from vision.wake_dataset import WakeBundle, load_wake_bundle, variant_tensor
+from vision.wake_model import select_device
 
 
 def parse_args() -> argparse.Namespace:
@@ -38,557 +50,216 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--backbone",
         default="resnet18",
-        choices=["resnet18", "mae_vit"],
+        choices=["resnet18", "mae_vit", "jepa", "smallcnn", "simsiam"],
         help="Encoder backbone architecture",
+    )
+    parser.add_argument(
+        "--run-name",
+        default=None,
+        help="Run name for output subdirectory (default: backbone name)",
+    )
+    parser.add_argument(
+        "--run-dir",
+        default=None,
+        help="Experiment output directory. Defaults to runs/<config-name>.",
     )
     return parser.parse_args()
 
 
-def set_seed(seed: int) -> None:
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-
-
-def _tensor_loader(
-    x: np.ndarray, shape_idx: np.ndarray, params: np.ndarray, re_idx: np.ndarray, batch_size: int
-) -> DataLoader:
-    dataset = TensorDataset(
-        torch.from_numpy(x).float(),
-        torch.from_numpy(shape_idx).long(),
-        torch.from_numpy(params).float(),
-        torch.from_numpy(re_idx).long(),
+def _labels_for_indices(
+    bundle: WakeBundle, label_maps, indices: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    shape_idx = np.asarray(
+        [label_maps.shape_to_idx[value] for value in bundle.shapes[indices]],
+        dtype=np.int64,
     )
-    return DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    re_idx = np.asarray(
+        [label_maps.re_to_idx[int(value)] for value in bundle.re_values[indices]],
+        dtype=np.int64,
+    )
+    return shape_idx, re_idx
 
 
-def _predict(
-    model: torch.nn.Module, x: np.ndarray, *, batch_size: int, device: torch.device
-) -> dict[str, np.ndarray]:
-    dataset = TensorDataset(torch.from_numpy(x).float())
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+def _params_for_indices(bundle: WakeBundle, indices: np.ndarray) -> np.ndarray:
+    if indices.shape[0] == 0:
+        return np.array([]).reshape(0, 2).astype(np.float32)
+    return np.stack([bundle.dy[indices], bundle.eps[indices]], axis=1).astype(np.float32)
 
-    shape_logits = []
-    params_pred = []
-    re_logits = []
-    model.eval()
-    with torch.no_grad():
-        for (batch_x,) in loader:
-            outputs = model(batch_x.to(device))
-            shape_logits.append(outputs["shape_logits"].detach().cpu().numpy())
-            params_pred.append(outputs["params_pred"].detach().cpu().numpy())
-            re_logits.append(outputs["re_logits"].detach().cpu().numpy())
 
-    return {
-        "shape_logits": np.concatenate(shape_logits, axis=0),
-        "params_pred": np.concatenate(params_pred, axis=0),
-        "re_logits": np.concatenate(re_logits, axis=0),
+def _train_for_indices(
+    *,
+    backbone: str,
+    x_all: np.ndarray,
+    bundle: WakeBundle,
+    label_maps,
+    idx_train: np.ndarray,
+    idx_val: np.ndarray,
+    cfg: dict,
+    seed: int,
+    device,
+):
+    shape_train_idx, re_train_idx = _labels_for_indices(bundle, label_maps, idx_train)
+    shape_val_idx, re_val_idx = (
+        _labels_for_indices(bundle, label_maps, idx_val)
+        if idx_val.shape[0] > 0
+        else (np.array([], dtype=np.int64), np.array([], dtype=np.int64))
+    )
+
+    return train_wake_backbone(
+        backbone=backbone,
+        x_train=x_all[idx_train],
+        shape_train_idx=shape_train_idx,
+        params_train=_params_for_indices(bundle, idx_train),
+        re_train_idx=re_train_idx,
+        x_val=x_all[idx_val],
+        shape_val_idx=shape_val_idx,
+        params_val=_params_for_indices(bundle, idx_val),
+        re_val_idx=re_val_idx,
+        cfg=cfg,
+        seed=seed,
+        n_shapes=len(label_maps.shape_to_idx),
+        n_re_classes=len(label_maps.re_to_idx),
+        device=device,
+    )
+
+
+def _evaluate_predictions(
+    *,
+    pred: dict[str, np.ndarray],
+    bundle: WakeBundle,
+    label_maps,
+    idx_test: np.ndarray,
+    cfg: dict,
+) -> tuple[dict[str, float], np.ndarray, np.ndarray, np.ndarray]:
+    shape_pred_idx = np.argmax(pred["shape_logits"], axis=1)
+    re_pred_idx = np.argmax(pred["re_logits"], axis=1)
+    shape_pred = np.asarray(
+        [label_maps.idx_to_shape[int(idx)] for idx in shape_pred_idx], dtype=object
+    )
+    dy_pred, eps_pred = clip_params(pred["params_pred"][:, 0], pred["params_pred"][:, 1], cfg)
+
+    dy_true = bundle.dy[idx_test].astype(np.float32)
+    eps_true = bundle.eps[idx_test].astype(np.float32)
+    targets = render_targets(
+        shapes=bundle.shapes[idx_test],
+        dy_values=dy_true,
+        eps_values=eps_true,
+        cfg=cfg,
+    )
+    predictions = render_targets(
+        shapes=shape_pred,
+        dy_values=dy_pred,
+        eps_values=eps_pred,
+        cfg=cfg,
+    )
+    inv_metrics = obstacle_iou_and_dice(
+        targets,
+        predictions,
+        threshold=float(cfg["reconstruction"].get("obstacle_threshold", 0.8)),
+    )
+    cls_metrics = accuracy_f1(bundle.shapes[idx_test], shape_pred)
+    re_acc = float(
+        np.mean(
+            re_pred_idx
+            == np.asarray(
+                [label_maps.re_to_idx[int(value)] for value in bundle.re_values[idx_test]],
+                dtype=int,
+            )
+        )
+    )
+
+    metrics = {
+        "accuracy": cls_metrics["accuracy"],
+        "macro_f1": cls_metrics["macro_f1"],
+        "re_accuracy": re_acc,
+        "dy_mae": float(np.mean(np.abs(dy_pred - dy_true))),
+        "eps_mae": float(np.mean(np.abs(eps_pred - eps_true))),
+        "inverse_iou": inv_metrics["iou_mean"],
+        "inverse_dice": inv_metrics["dice_mean"],
     }
+    return metrics, shape_pred, dy_pred, eps_pred
 
 
-def _train_model(
+def _shape_labels(label_maps) -> list[str]:
+    return [label_maps.idx_to_shape[idx] for idx in sorted(label_maps.idx_to_shape)]
+
+
+def _re_values(label_maps) -> list[int]:
+    return [label_maps.idx_to_re[idx] for idx in sorted(label_maps.idx_to_re)]
+
+
+def _train_repeated_holdouts(
     *,
-    x_train: np.ndarray,
-    shape_train_idx: np.ndarray,
-    params_train: np.ndarray,
-    re_train_idx: np.ndarray,
+    args: argparse.Namespace,
     cfg: dict,
-    seed: int,
-    n_shapes: int,
-    n_re_classes: int,
-    device: torch.device,
-) -> tuple[MultiScaleWakeNet, list[dict[str, float]]]:
-    train_cfg = cfg.get("vision", {}).get("training", {})
-    batch_size = int(train_cfg.get("batch_size", 16))
-    epochs = int(train_cfg.get("epochs", 8))
-    lr = float(train_cfg.get("lr", 1e-3))
-    weight_decay = float(train_cfg.get("weight_decay", 1e-4))
-    fusion_hidden = int(train_cfg.get("fusion_hidden", 256))
-    dropout = float(train_cfg.get("dropout", 0.15))
-
-    set_seed(seed)
-    model = MultiScaleWakeNet(
-        n_scales=int(x_train.shape[1]),
-        in_channels=int(x_train.shape[2]),
-        n_shapes=n_shapes,
-        n_re_classes=n_re_classes,
-        fusion_hidden=fusion_hidden,
-        dropout=dropout,
-    ).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-    loader = _tensor_loader(
-        x_train, shape_train_idx, params_train, re_train_idx, batch_size=batch_size
-    )
-
-    history: list[dict[str, float]] = []
-    for epoch in range(epochs):
-        model.train()
-        loss_total = 0.0
-        loss_shape = 0.0
-        loss_params = 0.0
-        loss_re = 0.0
-        n_items = 0
-
-        for batch_x, batch_shape, batch_params, batch_re in loader:
-            batch_x = batch_x.to(device)
-            batch_shape = batch_shape.to(device)
-            batch_params = batch_params.to(device)
-            batch_re = batch_re.to(device)
-
-            optimizer.zero_grad(set_to_none=True)
-            outputs = model(batch_x)
-            loss, loss_parts = compute_multitask_loss(
-                outputs,
-                shape_target=batch_shape,
-                param_target=batch_params,
-                re_target=batch_re,
-            )
-            loss.backward()
-            optimizer.step()
-
-            batch_n = int(batch_x.shape[0])
-            n_items += batch_n
-            loss_total += loss_parts["loss_total"] * batch_n
-            loss_shape += loss_parts["loss_shape"] * batch_n
-            loss_params += loss_parts["loss_params"] * batch_n
-            loss_re += loss_parts["loss_re"] * batch_n
-
-        history.append(
-            {
-                "epoch": epoch + 1,
-                "loss_total": loss_total / max(n_items, 1),
-                "loss_shape": loss_shape / max(n_items, 1),
-                "loss_params": loss_params / max(n_items, 1),
-                "loss_re": loss_re / max(n_items, 1),
-            }
-        )
-
-    return model, history
-
-
-def _train_vit_model(
-    *,
-    x_train: np.ndarray,
-    shape_train_idx: np.ndarray,
-    params_train: np.ndarray,
-    re_train_idx: np.ndarray,
-    cfg: dict,
-    seed: int,
-    n_shapes: int,
-    n_re_classes: int,
-    device: torch.device,
-) -> tuple[torch.nn.Module, list[dict[str, float]]]:
-    from vision.mae_vit_model import MultiScaleViTWakeNet
-
-    vit_cfg = cfg.get("vision", {}).get("mae_vit", {})
-    batch_size = int(vit_cfg.get("batch_size", 8))
-    phase1_epochs = int(vit_cfg.get("phase1_epochs", 12))
-    phase2_epochs = int(vit_cfg.get("phase2_epochs", 13))
-    phase1_lr = float(vit_cfg.get("phase1_lr", 2e-3))
-    phase2_base_lr = float(vit_cfg.get("phase2_base_lr", 5e-5))
-    llrd_decay = float(vit_cfg.get("llrd_decay", 0.85))
-    proj_dim = int(vit_cfg.get("proj_dim", 512))
-    fusion_hidden = int(vit_cfg.get("fusion_hidden", 512))
-    dropout = float(vit_cfg.get("dropout", 0.2))
-
-    set_seed(seed)
-    model = MultiScaleViTWakeNet(
-        n_scales=int(x_train.shape[1]),
-        in_channels=int(x_train.shape[2]),
-        n_shapes=n_shapes,
-        n_re_classes=n_re_classes,
-        proj_dim=proj_dim,
-        fusion_hidden=fusion_hidden,
-        dropout=dropout,
-        pretrained=True,
-    ).to(device)
-
-    loader = _tensor_loader(
-        x_train, shape_train_idx, params_train, re_train_idx, batch_size=batch_size
-    )
-    history: list[dict[str, float]] = []
-
-    model.freeze_backbone()
-    optimizer_p1 = torch.optim.AdamW(
-        list(model.scale_proj.parameters())
-        + list(model.fusion.parameters())
-        + list(model.shape_head.parameters())
-        + list(model.params_head.parameters())
-        + list(model.re_head.parameters()),
-        lr=phase1_lr,
-        weight_decay=1e-4,
-    )
-    scheduler_p1 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_p1, T_max=phase1_epochs)
-    for epoch in range(phase1_epochs):
-        model.train()
-        loss_total = 0.0
-        n_items = 0
-        for batch_x, batch_shape, batch_params, batch_re in loader:
-            batch_x = batch_x.to(device)
-            batch_shape = batch_shape.to(device)
-            batch_params = batch_params.to(device)
-            batch_re = batch_re.to(device)
-
-            optimizer_p1.zero_grad(set_to_none=True)
-            outputs = model(batch_x)
-            loss, _ = compute_multitask_loss(
-                outputs,
-                shape_target=batch_shape,
-                param_target=batch_params,
-                re_target=batch_re,
-            )
-            loss.backward()
-            optimizer_p1.step()
-
-            batch_n = int(batch_x.shape[0])
-            n_items += batch_n
-            loss_total += float(loss.detach().cpu()) * batch_n
-
-        scheduler_p1.step()
-        history.append(
-            {
-                "epoch": epoch + 1,
-                "phase": 1,
-                "loss_total": loss_total / max(n_items, 1),
-            }
-        )
-
-    llrd_groups = model.unfreeze_with_llrd(base_lr=phase2_base_lr, llrd_decay=llrd_decay)
-    optimizer_p2 = torch.optim.AdamW(llrd_groups, lr=phase2_base_lr)
-    scheduler_p2 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_p2, T_max=phase2_epochs)
-
-    for epoch in range(phase2_epochs):
-        model.train()
-        loss_total = 0.0
-        n_items = 0
-        for batch_x, batch_shape, batch_params, batch_re in loader:
-            batch_x = batch_x.to(device)
-            batch_shape = batch_shape.to(device)
-            batch_params = batch_params.to(device)
-            batch_re = batch_re.to(device)
-
-            optimizer_p2.zero_grad(set_to_none=True)
-            outputs = model(batch_x)
-            loss, _ = compute_multitask_loss(
-                outputs,
-                shape_target=batch_shape,
-                param_target=batch_params,
-                re_target=batch_re,
-            )
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer_p2.step()
-
-            batch_n = int(batch_x.shape[0])
-            n_items += batch_n
-            loss_total += float(loss.detach().cpu()) * batch_n
-
-        scheduler_p2.step()
-        history.append(
-            {
-                "epoch": phase1_epochs + epoch + 1,
-                "phase": 2,
-                "loss_total": loss_total / max(n_items, 1),
-            }
-        )
-
-    return model, history
-
-
-def _save_model_pack(
-    *,
-    output_path: Path,
-    model: torch.nn.Module,
-    model_type: str,
-    variant_name: str,
-    x_shape: tuple[int, ...],
-    shape_labels: list[str],
-    re_values: list[int],
-    test_case_ids: list[str],
-    cfg: dict,
-    seed: int,
-) -> None:
-    if model_type == "resnet18":
-        model_kwargs = {
-            "n_scales": int(x_shape[1]),
-            "in_channels": int(x_shape[2]),
-            "n_shapes": len(shape_labels),
-            "n_re_classes": len(re_values),
-            "fusion_hidden": int(
-                cfg.get("vision", {}).get("training", {}).get("fusion_hidden", 256)
-            ),
-            "dropout": float(cfg.get("vision", {}).get("training", {}).get("dropout", 0.15)),
-        }
-    else:
-        model_kwargs = {
-            "n_scales": int(x_shape[1]),
-            "in_channels": int(x_shape[2]),
-            "n_shapes": len(shape_labels),
-            "n_re_classes": len(re_values),
-            "proj_dim": int(cfg.get("vision", {}).get("mae_vit", {}).get("proj_dim", 512)),
-            "fusion_hidden": int(
-                cfg.get("vision", {}).get("mae_vit", {}).get("fusion_hidden", 512)
-            ),
-            "dropout": float(cfg.get("vision", {}).get("mae_vit", {}).get("dropout", 0.2)),
-        }
-    payload = {
-        "model_type": model_type,
-        "variant_name": variant_name,
-        "state_dict": model.state_dict(),
-        "model_kwargs": model_kwargs,
-        "shape_labels": shape_labels,
-        "re_values": re_values,
-        "test_case_ids": test_case_ids,
-        "fit_seed": int(seed),
-        "config_snapshot": cfg,
-    }
-    torch.save(payload, output_path)
-
-
-def _plot_variant_summary(summary_df: pd.DataFrame, output_path: Path) -> None:
-    ordered = summary_df.sort_values("macro_f1_mean").reset_index(drop=True)
-    x = np.arange(ordered.shape[0], dtype=float)
-
-    fig, ax = plt.subplots(figsize=(8.2, 4.8))
-    ax.bar(x, ordered["macro_f1_mean"], yerr=ordered["macro_f1_std"], color="#0ea5e9", alpha=0.85)
-    ax.set_xticks(x, ordered["variant"], rotation=18, ha="right")
-    ax.set_ylim(0.0, 1.05)
-    ax.set_ylabel("Macro F1")
-    ax.set_title("Wake-Field Variant Comparison")
-    ax.grid(axis="y", alpha=0.25)
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=180)
-    plt.close(fig)
-
-
-def _plot_training_curves(
-    histories: dict[str, list[dict[str, float]]],
-    output_path: Path,
-    *,
+    bundle: WakeBundle,
+    label_maps,
+    strata: np.ndarray,
+    repeat_seeds: list[int],
     export_seed: int,
-) -> None:
-    if not histories:
-        return
-
-    fig, ax = plt.subplots(figsize=(8.0, 4.6))
-    for variant_name, history in histories.items():
-        if not history:
-            continue
-        epochs = [row["epoch"] for row in history]
-        losses = [row["loss_total"] for row in history]
-        ax.plot(epochs, losses, marker="o", label=variant_name)
-    ax.set_xlabel("Epoch")
-    ax.set_ylabel("Training loss")
-    ax.set_title(f"Wake-Field Training Curves (seed={export_seed})")
-    ax.grid(alpha=0.25)
-    ax.legend()
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=180)
-    plt.close(fig)
-
-
-def _plot_confusion_matrix(
-    *,
-    y_true: np.ndarray,
-    y_pred: np.ndarray,
-    labels: list[str],
-    output_path: Path,
-) -> None:
-    cm = confusion_matrix(y_true, y_pred, labels=labels)
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
-    fig, ax = plt.subplots(figsize=(6.4, 5.4))
-    disp.plot(ax=ax, cmap="Blues", colorbar=False)
-    ax.set_title("Wake-Field Main Variant Confusion Matrix")
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=180)
-    plt.close(fig)
-
-
-def _write_summary(
-    *,
-    output_path: Path,
-    summary_df: pd.DataFrame,
-    leave_one_re_df: pd.DataFrame,
-    main_variant: str,
-    single_variant: str,
-) -> None:
-    summary_sorted = summary_df.sort_values("macro_f1_mean", ascending=False).reset_index(drop=True)
-    main_row = summary_sorted.loc[summary_sorted["variant"] == main_variant].iloc[0]
-    single_row = summary_sorted.loc[summary_sorted["variant"] == single_variant].iloc[0]
-
-    lines = [
-        "# Wake-Field Training Summary",
-        "",
-        f"- Main variant: `{main_variant}`",
-        f"- Main repeated holdout: acc={main_row['accuracy_mean']:.4f}+/-{main_row['accuracy_std']:.4f}, macroF1={main_row['macro_f1_mean']:.4f}+/-{main_row['macro_f1_std']:.4f}",
-        f"- Single-scale (`{single_variant}`) vs multi-scale macroF1: {single_row['macro_f1_mean']:.4f} -> {main_row['macro_f1_mean']:.4f}",
-        "",
-        "## Repeated Holdout Comparison",
-    ]
-
-    for _, row in summary_sorted.iterrows():
-        lines.append(
-            f"- {row['variant']}: acc={row['accuracy_mean']:.4f}+/-{row['accuracy_std']:.4f}, "
-            f"macroF1={row['macro_f1_mean']:.4f}+/-{row['macro_f1_std']:.4f}, "
-            f"dy_MAE={row['dy_mae_mean']:.5f}, eps_MAE={row['eps_mae_mean']:.5f}, "
-            f"IoU={row['inverse_iou_mean']:.4f}, Dice={row['inverse_dice_mean']:.4f}"
-        )
-
-    lines.append("")
-    lines.append("## Leave-One-Re-Out (Main Variant)")
-    for _, row in leave_one_re_df.iterrows():
-        lines.append(
-            f"- Re={int(row['Re_test'])}: acc={row['accuracy']:.4f}, macroF1={row['macro_f1']:.4f}, "
-            f"dy_MAE={row['dy_mae']:.5f}, eps_MAE={row['eps_mae']:.5f}, IoU={row['inverse_iou']:.4f}, Dice={row['inverse_dice']:.4f}"
-        )
-
-    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
-def main() -> None:
-    args = parse_args()
-    cfg = load_config(args.config)
-    root = repo_root()
-    logger = setup_logger("train_wake", root / "logs" / "train_wake.log")
-
-    bundle = load_wake_bundle()
-    label_maps = build_label_maps(bundle)
-    strata = stratification_labels(bundle)
-    ml_cfg = cfg["ml"]
-    test_n = compute_stratified_test_n(
-        bundle.case_ids.shape[0], len(np.unique(strata)), float(ml_cfg.get("test_size", 0.2))
-    )
-    repeat_seeds = [int(seed) for seed in ml_cfg.get("repeat_seeds", [42])]
-    export_seed = int(cfg.get("vision", {}).get("training", {}).get("export_seed", repeat_seeds[0]))
-    if export_seed not in repeat_seeds:
-        export_seed = repeat_seeds[0]
-    batch_size = int(cfg.get("vision", {}).get("training", {}).get("batch_size", 16))
-    device = select_device()
-
-    models_dir = root / "models"
-    reports_dir = root / "reports"
-    models_dir.mkdir(parents=True, exist_ok=True)
-    reports_dir.mkdir(parents=True, exist_ok=True)
-
+    test_n: int,
+    val_ratio: float,
+    batch_size: int,
+    device,
+    models_dir,
+    reports_dir,
+) -> tuple[pd.DataFrame, dict[str, list[dict[str, float]]]]:
     all_rows = []
     histories_for_plot: dict[str, list[dict[str, float]]] = {}
     main_variant = "dist_multi_4ch"
     single_variant = "dist_single_4ch"
 
     for variant_name, spec in VARIANTS.items():
-        logger.info("Training wake-field variant %s with backbone=%s", variant_name, args.backbone)
         x_all = variant_tensor(bundle, scales=spec["scales"], channels=spec["channels"])
 
         for seed in repeat_seeds:
             idx_train, idx_test = repeated_holdout_split(strata, test_n=test_n, seed=seed)
-            shape_train_idx = np.asarray(
-                [label_maps.shape_to_idx[value] for value in bundle.shapes[idx_train]],
-                dtype=np.int64,
-            )
-            re_train_idx = np.asarray(
-                [label_maps.re_to_idx[int(value)] for value in bundle.re_values[idx_train]],
-                dtype=np.int64,
-            )
-            params_train = np.stack([bundle.dy[idx_train], bundle.eps[idx_train]], axis=1).astype(
-                np.float32
-            )
+            idx_train_real, idx_val = _split_train_val(idx_train, strata, val_ratio, seed)
 
-            if args.backbone == "mae_vit":
-                model, history = _train_vit_model(
-                    x_train=x_all[idx_train],
-                    shape_train_idx=shape_train_idx,
-                    params_train=params_train,
-                    re_train_idx=re_train_idx,
-                    cfg=cfg,
-                    seed=seed,
-                    n_shapes=len(label_maps.shape_to_idx),
-                    n_re_classes=len(label_maps.re_to_idx),
-                    device=device,
-                )
-            else:
-                model, history = _train_model(
-                    x_train=x_all[idx_train],
-                    shape_train_idx=shape_train_idx,
-                    params_train=params_train,
-                    re_train_idx=re_train_idx,
-                    cfg=cfg,
-                    seed=seed,
-                    n_shapes=len(label_maps.shape_to_idx),
-                    n_re_classes=len(label_maps.re_to_idx),
-                    device=device,
-                )
-
+            model, history = _train_for_indices(
+                backbone=args.backbone,
+                x_all=x_all,
+                bundle=bundle,
+                label_maps=label_maps,
+                idx_train=idx_train_real,
+                idx_val=idx_val,
+                cfg=cfg,
+                seed=seed,
+                device=device,
+            )
             if seed == export_seed:
                 histories_for_plot[variant_name] = history
 
             pred = _predict(model, x_all[idx_test], batch_size=batch_size, device=device)
-            shape_pred_idx = np.argmax(pred["shape_logits"], axis=1)
-            re_pred_idx = np.argmax(pred["re_logits"], axis=1)
-            shape_pred = np.asarray(
-                [label_maps.idx_to_shape[int(idx)] for idx in shape_pred_idx], dtype=object
+            metrics, shape_pred, _dy_pred, _eps_pred = _evaluate_predictions(
+                pred=pred, bundle=bundle, label_maps=label_maps, idx_test=idx_test, cfg=cfg
+            )
+            all_rows.append(
+                {
+                    "variant": variant_name,
+                    "description": spec["description"],
+                    "seed": int(seed),
+                    "train_size": int(idx_train_real.shape[0]),
+                    "val_size": int(idx_val.shape[0]),
+                    "test_size": int(idx_test.shape[0]),
+                    **metrics,
+                }
             )
 
-            dy_pred, eps_pred = clip_params(
-                pred["params_pred"][:, 0], pred["params_pred"][:, 1], cfg
-            )
-            dy_true = bundle.dy[idx_test].astype(np.float32)
-            eps_true = bundle.eps[idx_test].astype(np.float32)
-            targets = render_targets(
-                shapes=bundle.shapes[idx_test],
-                dy_values=dy_true,
-                eps_values=eps_true,
-                cfg=cfg,
-            )
-            predictions = render_targets(
-                shapes=shape_pred,
-                dy_values=dy_pred,
-                eps_values=eps_pred,
-                cfg=cfg,
-            )
-            inv_metrics = obstacle_iou_and_dice(
-                targets,
-                predictions,
-                threshold=float(cfg["reconstruction"].get("obstacle_threshold", 0.8)),
-            )
-            cls_metrics = accuracy_f1(bundle.shapes[idx_test], shape_pred)
-            re_acc = float(
-                np.mean(
-                    re_pred_idx
-                    == np.asarray(
-                        [label_maps.re_to_idx[int(value)] for value in bundle.re_values[idx_test]],
-                        dtype=int,
-                    )
+            if seed == export_seed and variant_name in {single_variant, main_variant}:
+                output_name = (
+                    "wake_field_single.pt"
+                    if variant_name == single_variant
+                    else "wake_field_main.pt"
                 )
-            )
-
-            row = {
-                "variant": variant_name,
-                "description": spec["description"],
-                "seed": int(seed),
-                "train_size": int(idx_train.shape[0]),
-                "test_size": int(idx_test.shape[0]),
-                "accuracy": cls_metrics["accuracy"],
-                "macro_f1": cls_metrics["macro_f1"],
-                "re_accuracy": re_acc,
-                "dy_mae": float(np.mean(np.abs(dy_pred - dy_true))),
-                "eps_mae": float(np.mean(np.abs(eps_pred - eps_true))),
-                "inverse_iou": inv_metrics["iou_mean"],
-                "inverse_dice": inv_metrics["dice_mean"],
-            }
-            all_rows.append(row)
-
-            if seed == export_seed and variant_name == single_variant:
                 _save_model_pack(
-                    output_path=models_dir / "wake_field_single.pt",
+                    output_path=models_dir / output_name,
                     model=model.cpu(),
                     model_type=args.backbone,
                     variant_name=variant_name,
                     x_shape=x_all.shape,
-                    shape_labels=[
-                        label_maps.idx_to_shape[idx] for idx in sorted(label_maps.idx_to_shape)
-                    ],
-                    re_values=[label_maps.idx_to_re[idx] for idx in sorted(label_maps.idx_to_re)],
+                    shape_labels=_shape_labels(label_maps),
+                    re_values=_re_values(label_maps),
                     test_case_ids=bundle.case_ids[idx_test].tolist(),
                     cfg=cfg,
                     seed=seed,
@@ -596,44 +267,19 @@ def main() -> None:
                 model = model.to(device)
 
             if seed == export_seed and variant_name == main_variant:
-                _save_model_pack(
-                    output_path=models_dir / "wake_field_main.pt",
-                    model=model.cpu(),
-                    model_type=args.backbone,
-                    variant_name=variant_name,
-                    x_shape=x_all.shape,
-                    shape_labels=[
-                        label_maps.idx_to_shape[idx] for idx in sorted(label_maps.idx_to_shape)
-                    ],
-                    re_values=[label_maps.idx_to_re[idx] for idx in sorted(label_maps.idx_to_re)],
-                    test_case_ids=bundle.case_ids[idx_test].tolist(),
-                    cfg=cfg,
-                    seed=seed,
-                )
-                model = model.to(device)
-                _plot_confusion_matrix(
+                plot_confusion_matrix(
                     y_true=bundle.shapes[idx_test],
                     y_pred=shape_pred,
-                    labels=[
-                        label_maps.idx_to_shape[idx] for idx in sorted(label_maps.idx_to_shape)
-                    ],
+                    labels=_shape_labels(label_maps),
                     output_path=reports_dir / "wake_field_confusion_matrix.png",
                 )
 
-            logger.info(
-                "Variant %s seed=%d done. acc=%.4f macro_f1=%.4f dy_mae=%.5f eps_mae=%.5f",
-                variant_name,
-                seed,
-                row["accuracy"],
-                row["macro_f1"],
-                row["dy_mae"],
-                row["eps_mae"],
-            )
-
     holdout_df = pd.DataFrame(all_rows).sort_values(["variant", "seed"]).reset_index(drop=True)
-    holdout_df.to_csv(reports_dir / "wake_field_holdout_repeats.csv", index=False)
+    return holdout_df, histories_for_plot
 
-    summary_df = (
+
+def _summarize_holdouts(holdout_df: pd.DataFrame) -> pd.DataFrame:
+    return (
         holdout_df.groupby(["variant", "description"], as_index=False)
         .agg(
             accuracy_mean=("accuracy", "mean"),
@@ -648,126 +294,155 @@ def main() -> None:
         )
         .fillna(0.0)
     )
-    summary_df.to_csv(reports_dir / "wake_field_variant_summary.csv", index=False)
 
-    _plot_variant_summary(summary_df, reports_dir / "wake_field_variant_comparison.png")
-    _plot_training_curves(
-        histories_for_plot, reports_dir / "wake_field_training_curves.png", export_seed=export_seed
-    )
 
-    main_spec = VARIANTS[main_variant]
+def _leave_one_re_out(
+    *,
+    args: argparse.Namespace,
+    cfg: dict,
+    bundle: WakeBundle,
+    label_maps,
+    strata: np.ndarray,
+    val_ratio: float,
+    batch_size: int,
+    device,
+) -> pd.DataFrame:
+    main_spec = VARIANTS["dist_multi_4ch"]
     x_main = variant_tensor(bundle, scales=main_spec["scales"], channels=main_spec["channels"])
     leave_rows = []
+
     for re_test in sorted(np.unique(bundle.re_values)):
         idx_train = np.where(bundle.re_values != re_test)[0]
         idx_test = np.where(bundle.re_values == re_test)[0]
-
-        if args.backbone == "mae_vit":
-            model, _ = _train_vit_model(
-                x_train=x_main[idx_train],
-                shape_train_idx=np.asarray(
-                    [label_maps.shape_to_idx[value] for value in bundle.shapes[idx_train]],
-                    dtype=np.int64,
-                ),
-                params_train=np.stack([bundle.dy[idx_train], bundle.eps[idx_train]], axis=1).astype(
-                    np.float32
-                ),
-                re_train_idx=np.asarray(
-                    [label_maps.re_to_idx[int(value)] for value in bundle.re_values[idx_train]],
-                    dtype=np.int64,
-                ),
-                cfg=cfg,
-                seed=1000 + int(re_test),
-                n_shapes=len(label_maps.shape_to_idx),
-                n_re_classes=len(label_maps.re_to_idx),
-                device=device,
-            )
-        else:
-            model, _ = _train_model(
-                x_train=x_main[idx_train],
-                shape_train_idx=np.asarray(
-                    [label_maps.shape_to_idx[value] for value in bundle.shapes[idx_train]],
-                    dtype=np.int64,
-                ),
-                params_train=np.stack([bundle.dy[idx_train], bundle.eps[idx_train]], axis=1).astype(
-                    np.float32
-                ),
-                re_train_idx=np.asarray(
-                    [label_maps.re_to_idx[int(value)] for value in bundle.re_values[idx_train]],
-                    dtype=np.int64,
-                ),
-                cfg=cfg,
-                seed=1000 + int(re_test),
-                n_shapes=len(label_maps.shape_to_idx),
-                n_re_classes=len(label_maps.re_to_idx),
-                device=device,
-            )
-        pred = _predict(model, x_main[idx_test], batch_size=batch_size, device=device)
-        shape_pred = np.asarray(
-            [label_maps.idx_to_shape[int(idx)] for idx in np.argmax(pred["shape_logits"], axis=1)],
-            dtype=object,
+        idx_train_real, idx_val = _split_train_val(
+            idx_train, strata, val_ratio, seed=1000 + int(re_test)
         )
-        dy_pred, eps_pred = clip_params(pred["params_pred"][:, 0], pred["params_pred"][:, 1], cfg)
-        targets = render_targets(
-            shapes=bundle.shapes[idx_test],
-            dy_values=bundle.dy[idx_test],
-            eps_values=bundle.eps[idx_test],
+        model, _ = _train_for_indices(
+            backbone=args.backbone,
+            x_all=x_main,
+            bundle=bundle,
+            label_maps=label_maps,
+            idx_train=idx_train_real,
+            idx_val=idx_val,
             cfg=cfg,
+            seed=1000 + int(re_test),
+            device=device,
         )
-        predictions = render_targets(
-            shapes=shape_pred, dy_values=dy_pred, eps_values=eps_pred, cfg=cfg
+        pred = _predict(model, x_main[idx_test], batch_size=batch_size, device=device)
+        metrics, _shape_pred, _dy_pred, _eps_pred = _evaluate_predictions(
+            pred=pred, bundle=bundle, label_maps=label_maps, idx_test=idx_test, cfg=cfg
         )
-        inv_metrics = obstacle_iou_and_dice(
-            targets,
-            predictions,
-            threshold=float(cfg["reconstruction"].get("obstacle_threshold", 0.8)),
-        )
-        cls_metrics = accuracy_f1(bundle.shapes[idx_test], shape_pred)
-
         leave_rows.append(
             {
                 "Re_test": int(re_test),
                 "n_test": int(idx_test.shape[0]),
-                "accuracy": cls_metrics["accuracy"],
-                "macro_f1": cls_metrics["macro_f1"],
-                "dy_mae": float(np.mean(np.abs(dy_pred - bundle.dy[idx_test]))),
-                "eps_mae": float(np.mean(np.abs(eps_pred - bundle.eps[idx_test]))),
-                "inverse_iou": inv_metrics["iou_mean"],
-                "inverse_dice": inv_metrics["dice_mean"],
+                "accuracy": metrics["accuracy"],
+                "macro_f1": metrics["macro_f1"],
+                "dy_mae": metrics["dy_mae"],
+                "eps_mae": metrics["eps_mae"],
+                "inverse_iou": metrics["inverse_iou"],
+                "inverse_dice": metrics["inverse_dice"],
             }
         )
-        logger.info(
-            "Leave-one-Re-out main variant Re=%d done. acc=%.4f macro_f1=%.4f",
-            int(re_test),
-            cls_metrics["accuracy"],
-            cls_metrics["macro_f1"],
-        )
 
-    leave_one_re_df = pd.DataFrame(leave_rows).sort_values("Re_test").reset_index(drop=True)
+    return pd.DataFrame(leave_rows).sort_values("Re_test").reset_index(drop=True)
+
+
+def main() -> None:
+    args = parse_args()
+    cfg = load_config(args.config)
+    paths = experiment_paths(cfg, config_path=args.config, run_dir=args.run_dir)
+    run_name = args.run_name or args.backbone
+    write_run_manifest(
+        paths=paths,
+        cfg=cfg,
+        config_path=args.config,
+        stage="train_wake",
+        extra={"backbone": args.backbone, "run_name": run_name},
+    )
+    logger = setup_logger("train_wake", paths.logs_dir / f"train_wake_{run_name}.log")
+
+    bundle = load_wake_bundle(paths.wake_fields_dir)
+    label_maps = build_label_maps(bundle)
+    strata = stratification_labels(bundle)
+    ml_cfg = cfg["ml"]
+    test_n = compute_stratified_test_n(
+        bundle.case_ids.shape[0], len(np.unique(strata)), float(ml_cfg.get("test_size", 0.2))
+    )
+    repeat_seeds = [int(seed) for seed in ml_cfg.get("repeat_seeds", [42])]
+    export_seed = int(cfg.get("vision", {}).get("training", {}).get("export_seed", repeat_seeds[0]))
+    if export_seed not in repeat_seeds:
+        export_seed = repeat_seeds[0]
+    batch_size = int(cfg.get("vision", {}).get("training", {}).get("batch_size", 16))
+    device = select_device()
+    val_ratio = float(cfg.get("vision", {}).get("training", {}).get("val_ratio", 0.0))
+
+    models_dir = paths.models_dir / run_name
+    reports_dir = paths.reports_dir / run_name
+    models_dir.mkdir(parents=True, exist_ok=True)
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info("Training wake-field backbone=%s run=%s", args.backbone, run_name)
+    holdout_df, histories_for_plot = _train_repeated_holdouts(
+        args=args,
+        cfg=cfg,
+        bundle=bundle,
+        label_maps=label_maps,
+        strata=strata,
+        repeat_seeds=repeat_seeds,
+        export_seed=export_seed,
+        test_n=test_n,
+        val_ratio=val_ratio,
+        batch_size=batch_size,
+        device=device,
+        models_dir=models_dir,
+        reports_dir=reports_dir,
+    )
+    holdout_df.to_csv(reports_dir / "wake_field_holdout_repeats.csv", index=False)
+
+    summary_df = _summarize_holdouts(holdout_df)
+    summary_df.to_csv(reports_dir / "wake_field_variant_summary.csv", index=False)
+    plot_variant_summary(summary_df, reports_dir / "wake_field_variant_comparison.png")
+    plot_training_curves(
+        histories_for_plot, reports_dir / "wake_field_training_curves.png", export_seed=export_seed
+    )
+
+    leave_one_re_df = _leave_one_re_out(
+        args=args,
+        cfg=cfg,
+        bundle=bundle,
+        label_maps=label_maps,
+        strata=strata,
+        val_ratio=val_ratio,
+        batch_size=batch_size,
+        device=device,
+    )
     leave_one_re_df.to_csv(reports_dir / "wake_field_leave_one_re_out.csv", index=False)
-
-    _write_summary(
+    write_wake_summary(
         output_path=reports_dir / "wake_field_summary.md",
         summary_df=summary_df,
         leave_one_re_df=leave_one_re_df,
-        main_variant=main_variant,
-        single_variant=single_variant,
+        main_variant="dist_multi_4ch",
+        single_variant="dist_single_4ch",
     )
 
     selection_payload = {
-        "main_variant": main_variant,
+        "main_variant": "dist_multi_4ch",
         "speed_variant": None,
         "device": str(device),
         "repeat_seeds": repeat_seeds,
         "test_size": int(test_n),
+        "run_dir": str(paths.run_dir),
+        "wake_fields_dir": str(paths.wake_fields_dir),
+        "models_dir": str(models_dir),
+        "reports_dir": str(reports_dir),
     }
     (reports_dir / "wake_field_selection.json").write_text(
         json.dumps(selection_payload, indent=2), encoding="utf-8"
     )
-
     logger.info(
         "Wake-field training complete. main_variant=%s summary=%s",
-        main_variant,
+        "dist_multi_4ch",
         reports_dir / "wake_field_summary.md",
     )
 

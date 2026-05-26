@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "End-to-end pipeline for fluid shape recognition from wake fields"
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.12"
 authors = [
     {name = "Chen Yihao", email = "chenyihao@example.com"},
 ]

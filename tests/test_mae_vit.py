@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from vision.diff_renderer import DifferentiableShapeRenderer
-from vision.mae_vit_model import MAEViTEncoder, MultiScaleViTWakeNet, select_device
+from vision.mae_vit_model import MAEViTEncoder, MultiScaleViTWakeNet
 
 
 class TestMAEViTForward:

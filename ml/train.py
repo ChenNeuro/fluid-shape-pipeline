@@ -14,8 +14,9 @@ from sklearn.metrics import ConfusionMatrixDisplay, accuracy_score, confusion_ma
 from sklearn.model_selection import StratifiedKFold, cross_val_predict, train_test_split
 from sklearn.preprocessing import StandardScaler
 
-from sim.config import load_config, repo_root
+from sim.config import load_config
 from sim.data_schema import find_probes_csv
+from sim.experiment import experiment_paths, write_run_manifest
 from sim.logging_utils import setup_logger
 
 META_COLS = ["case_id", "shape", "Re", "dy", "eps", "seed"]
@@ -24,6 +25,11 @@ META_COLS = ["case_id", "shape", "Re", "dy", "eps", "seed"]
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train baseline classifier and generate reports")
     parser.add_argument("--config", default="configs/default.yaml", help="Path to YAML config")
+    parser.add_argument(
+        "--run-dir",
+        default=None,
+        help="Experiment output directory. Defaults to runs/<config-name>.",
+    )
     return parser.parse_args()
 
 
@@ -343,25 +349,37 @@ def _write_summary(
     lines.append("")
     lines.append("## Experiment Setup")
     lines.append(
-        f"- Solver mode: `{cfg['project'].get('solver', 'synthetic')}` (this run used synthetic baseline)"
+        f"- Solver mode: `{cfg['project'].get('solver', 'synthetic')}` "
+        "(this run used synthetic baseline)"
     )
     lines.append(
-        f"- Shapes: {', '.join(sim_cfg['shapes'])}; Re set: {sim_cfg['re_values']}; perturbations per (shape, Re): {sim_cfg['perturbations_per_combo']}"
+        f"- Shapes: {', '.join(sim_cfg['shapes'])}; "
+        f"Re set: {sim_cfg['re_values']}; perturbations per (shape, Re): "
+        f"{sim_cfg['perturbations_per_combo']}"
     )
     lines.append(
-        f"- Probes: N={sim_cfg['probes_n']} at outlet x=L; geometry perturbation: dy in [{sim_cfg['perturb']['dy_min']}, {sim_cfg['perturb']['dy_max']}] * H, eps in [0, {sim_cfg['perturb']['eps_max']}]"
+        f"- Probes: N={sim_cfg['probes_n']} at outlet x=L; "
+        "geometry perturbation: "
+        f"dy in [{sim_cfg['perturb']['dy_min']}, "
+        f"{sim_cfg['perturb']['dy_max']}] * H, "
+        f"eps in [0, {sim_cfg['perturb']['eps_max']}]"
     )
     lines.append(
-        f"- Data rows in `features.csv`: {features_df.shape[0]}, feature dimensions: {features_df.shape[1] - len(META_COLS)}"
+        f"- Data rows in `features.csv`: {features_df.shape[0]}, "
+        f"feature dimensions: {features_df.shape[1] - len(META_COLS)}"
     )
     lines.append(
-        f"- Case execution: total={total_cases}, success={success_cases}, failed={failed_cases}, failure rate={failure_rate:.2f}%"
+        f"- Case execution: total={total_cases}, success={success_cases}, "
+        f"failed={failed_cases}, failure rate={failure_rate:.2f}%"
     )
     lines.append("")
 
     lines.append("## Baseline Split Metrics (Stratified Holdout)")
     lines.append(
-        f"- Split strategy: stratified by `(shape, Re)` with train={split_meta['train_size']} test={split_meta['test_size']} (requested test ratio={split_meta['requested_test_ratio']:.3f}, applied ratio={split_meta['applied_test_ratio']:.3f})"
+        f"- Split strategy: stratified by `(shape, Re)` with "
+        f"train={split_meta['train_size']} test={split_meta['test_size']} "
+        f"(requested test ratio={split_meta['requested_test_ratio']:.3f}, "
+        f"applied ratio={split_meta['applied_test_ratio']:.3f})"
     )
     lines.append(f"- Accuracy: {split_metrics['accuracy']:.4f}")
     lines.append(f"- Macro F1: {split_metrics['macro_f1']:.4f}")
@@ -370,10 +388,12 @@ def _write_summary(
     lines.append("## Multi-Seed Holdout Stability")
     lines.append(f"- Seeds: {repeat_seeds}")
     lines.append(
-        f"- Accuracy mean±std: {repeat_metrics_summary['accuracy_mean']:.4f} ± {repeat_metrics_summary['accuracy_std']:.4f}"
+        f"- Accuracy mean±std: {repeat_metrics_summary['accuracy_mean']:.4f} ± "
+        f"{repeat_metrics_summary['accuracy_std']:.4f}"
     )
     lines.append(
-        f"- Macro F1 mean±std: {repeat_metrics_summary['macro_f1_mean']:.4f} ± {repeat_metrics_summary['macro_f1_std']:.4f}"
+        f"- Macro F1 mean±std: {repeat_metrics_summary['macro_f1_mean']:.4f} ± "
+        f"{repeat_metrics_summary['macro_f1_std']:.4f}"
     )
     lines.append("- Per-seed table: `reports/holdout_repeats.csv`")
     lines.append("")
@@ -381,14 +401,17 @@ def _write_summary(
     lines.append("## Leave-One-Re-Out Generalization")
     for row in re_results:
         lines.append(
-            f"- Train on Re != {row['Re_test']}, test on Re={row['Re_test']} (n={row['n_test']}): accuracy={row['accuracy']:.4f}, macro F1={row['macro_f1']:.4f}"
+            f"- Train on Re != {row['Re_test']}, test on Re={row['Re_test']} "
+            f"(n={row['n_test']}): accuracy={row['accuracy']:.4f}, "
+            f"macro F1={row['macro_f1']:.4f}"
         )
     lines.append("")
 
     lines.append("## Robustness Sweep (|eps| bins)")
     for row in robust_rows:
         lines.append(
-            f"- |eps|~{row['eps_bin_center']:.5f}: accuracy={row['accuracy']:.4f} (n={row['count']})"
+            f"- |eps|~{row['eps_bin_center']:.5f}: "
+            f"accuracy={row['accuracy']:.4f} (n={row['count']})"
         )
     lines.append("")
 
@@ -409,7 +432,8 @@ def _write_summary(
 
     lines.append("## Key Conclusions")
     lines.append(
-        "- Outlet probe velocity signatures are separable across obstacle shapes with the current feature set."
+        "- Outlet probe velocity signatures are separable across obstacle shapes "
+        "with the current feature set."
     )
     lines.append(f"- {feature_note}")
     lines.append(f"- {robustness_note}")
@@ -417,13 +441,16 @@ def _write_summary(
 
     lines.append("## Next Steps")
     lines.append(
-        "- Replace synthetic generator with OpenFOAM runs for physics-grounded validation while keeping raw CSV schema unchanged."
+        "- Replace synthetic generator with OpenFOAM runs for physics-grounded "
+        "validation while keeping raw CSV schema unchanged."
     )
     lines.append(
-        "- Add more challenging perturbations (x-shift, obstacle rotation, inlet profile changes) and domain randomization."
+        "- Add more challenging perturbations (x-shift, obstacle rotation, inlet "
+        "profile changes) and domain randomization."
     )
     lines.append(
-        "- Benchmark temporal models (1D CNN / transformer) directly on probe sequences against feature-based baseline."
+        "- Benchmark temporal models (1D CNN / transformer) directly on probe "
+        "sequences against feature-based baseline."
     )
 
     output_md.write_text("\n".join(lines), encoding="utf-8")
@@ -432,10 +459,11 @@ def _write_summary(
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
-    root = repo_root()
-    logger = setup_logger("train", root / "logs" / "train.log")
+    paths = experiment_paths(cfg, config_path=args.config, run_dir=args.run_dir)
+    write_run_manifest(paths=paths, cfg=cfg, config_path=args.config, stage="train")
+    logger = setup_logger("train", paths.logs_dir / "train.log")
 
-    features_csv = root / "data" / "features" / "features.csv"
+    features_csv = paths.features_dir / "features.csv"
     if not features_csv.exists():
         raise FileNotFoundError(f"Missing features file: {features_csv}. Run make dataset first.")
 
@@ -490,7 +518,7 @@ def main() -> None:
         seeds=repeat_seeds,
     )
 
-    reports_dir = root / "reports"
+    reports_dir = paths.reports_dir
     reports_dir.mkdir(parents=True, exist_ok=True)
     repeat_csv = reports_dir / "holdout_repeats.csv"
     pd.DataFrame(repeat_rows).to_csv(repeat_csv, index=False)
@@ -499,7 +527,7 @@ def main() -> None:
     labels = sorted(np.unique(y))
     _plot_confusion(y_test, y_pred, labels, reports_dir / "confusion_matrix.png")
     _plot_pca(features_df, feature_cols, reports_dir / "separability_pca.png")
-    _plot_spectra_examples(features_df, root / "data" / "raw", reports_dir / "spectra_examples.png")
+    _plot_spectra_examples(features_df, paths.raw_dir, reports_dir / "spectra_examples.png")
     robust_rows = _robustness_curve(
         x,
         y,
@@ -535,7 +563,10 @@ def main() -> None:
             "Frequency-domain descriptors are the dominant contributors among top-ranked features."
         )
     else:
-        feature_note = "Top contributors are mixed across frequency, statistics, and cross-probe structure features."
+        feature_note = (
+            "Top contributors are mixed across frequency, statistics, "
+            "and cross-probe structure features."
+        )
 
     if len(robust_rows) >= 2:
         acc_values = np.array([row["accuracy"] for row in robust_rows], dtype=float)
@@ -546,9 +577,15 @@ def main() -> None:
         spread = float(np.max(acc_values) - np.min(acc_values))
 
         if delta_end <= -0.05 or valley_drop >= 0.10 or spread >= 0.20:
-            robustness_note = "Accuracy shows a noticeable drop for parts of the perturbation range, indicating sensitivity to outlet geometry mismatch."
+            robustness_note = (
+                "Accuracy shows a noticeable drop for parts of the perturbation "
+                "range, indicating sensitivity to outlet geometry mismatch."
+            )
         elif delta_end >= 0.05:
-            robustness_note = "Accuracy increases slightly toward higher perturbation bins for this synthetic dataset."
+            robustness_note = (
+                "Accuracy increases slightly toward higher perturbation bins for "
+                "this synthetic dataset."
+            )
         else:
             robustness_note = (
                 "Accuracy remains broadly stable across the tested outlet lens perturbation range."
@@ -558,7 +595,7 @@ def main() -> None:
             "Robustness trend is inconclusive because available perturbation bins are limited."
         )
 
-    manifest_df = pd.read_csv(root / "data" / "raw" / "manifest.csv")
+    manifest_df = pd.read_csv(paths.raw_dir / "manifest.csv")
     _write_summary(
         reports_dir / "summary.md",
         cfg=cfg,
@@ -576,7 +613,7 @@ def main() -> None:
         manifest_df=manifest_df,
     )
 
-    models_dir = root / "models"
+    models_dir = paths.models_dir
     models_dir.mkdir(parents=True, exist_ok=True)
     model_path = models_dir / "baseline.pkl"
     with model_path.open("wb") as handle:

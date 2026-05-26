@@ -5,8 +5,9 @@ import json
 
 import pandas as pd
 
-from sim.config import load_config, repo_root
+from sim.config import load_config
 from sim.data_schema import find_wake_frames_npz
+from sim.experiment import experiment_paths, write_run_manifest
 from sim.logging_utils import setup_logger
 from vision.wake_field_builder import build_case_wake_field
 
@@ -18,16 +19,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config", default="configs/wake_field_450.yaml", help="Path to YAML config"
     )
+    parser.add_argument(
+        "--run-dir",
+        default=None,
+        help="Experiment output directory. Defaults to runs/<config-name>.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
-    root = repo_root()
-    logger = setup_logger("wake_fields", root / "logs" / "wake_fields.log")
+    paths = experiment_paths(cfg, config_path=args.config, run_dir=args.run_dir)
+    write_run_manifest(paths=paths, cfg=cfg, config_path=args.config, stage="wake_fields")
+    logger = setup_logger("wake_fields", paths.logs_dir / "wake_fields.log")
 
-    manifest_path = root / "data" / "raw" / "manifest.csv"
+    manifest_path = paths.raw_dir / "manifest.csv"
     if not manifest_path.exists():
         raise FileNotFoundError(
             f"Manifest not found: {manifest_path}. Run dataset generation first."
@@ -42,7 +49,7 @@ def main() -> None:
     skipped = 0
     for _, item in ok_cases.iterrows():
         case_id = str(item["case_id"])
-        case_dir = root / "data" / "raw" / case_id
+        case_dir = paths.raw_dir / case_id
         try:
             find_wake_frames_npz(case_dir)
         except FileNotFoundError:
@@ -61,7 +68,7 @@ def main() -> None:
     if not rows:
         raise RuntimeError("Wake-field build produced no rows")
 
-    output_dir = root / "data" / "wake_fields"
+    output_dir = paths.wake_fields_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     index_path = output_dir / "index.csv"
     pd.DataFrame(rows).sort_values("case_id").to_csv(index_path, index=False)

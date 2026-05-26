@@ -16,7 +16,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
-from sim.config import load_config, repo_root
+from sim.config import load_config
+from sim.experiment import experiment_paths, write_run_manifest
 from sim.logging_utils import setup_logger
 
 META_COLS = ["case_id", "shape", "Re", "dy", "eps", "seed"]
@@ -25,6 +26,11 @@ META_COLS = ["case_id", "shape", "Re", "dy", "eps", "seed"]
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train SOTA-candidate models and select the best")
     parser.add_argument("--config", default="configs/default.yaml", help="Path to YAML config")
+    parser.add_argument(
+        "--run-dir",
+        default=None,
+        help="Experiment output directory. Defaults to runs/<config-name>.",
+    )
     return parser.parse_args()
 
 
@@ -251,14 +257,17 @@ def _write_sota_summary(
     lines.append("## Candidate Leaderboard (Repeated Holdout)")
     for _, row in leaderboard.iterrows():
         lines.append(
-            f"- {row['model']}: acc={row['accuracy_mean']:.4f}±{row['accuracy_std']:.4f}, macroF1={row['macro_f1_mean']:.4f}±{row['macro_f1_std']:.4f}"
+            f"- {row['model']}: acc={row['accuracy_mean']:.4f}±"
+            f"{row['accuracy_std']:.4f}, macroF1="
+            f"{row['macro_f1_mean']:.4f}±{row['macro_f1_std']:.4f}"
         )
     lines.append("")
 
     lines.append("## Leave-One-Re-Out")
     for row in re_rows:
         lines.append(
-            f"- Re={row['Re_test']}: acc={row['accuracy']:.4f}, macroF1={row['macro_f1']:.4f} (n={row['n_test']})"
+            f"- Re={row['Re_test']}: acc={row['accuracy']:.4f}, "
+            f"macroF1={row['macro_f1']:.4f} (n={row['n_test']})"
         )
     lines.append("")
 
@@ -274,10 +283,11 @@ def _write_sota_summary(
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
-    root = repo_root()
-    logger = setup_logger("train_sota", root / "logs" / "train_sota.log")
+    paths = experiment_paths(cfg, config_path=args.config, run_dir=args.run_dir)
+    write_run_manifest(paths=paths, cfg=cfg, config_path=args.config, stage="train_sota")
+    logger = setup_logger("train_sota", paths.logs_dir / "train_sota.log")
 
-    features_csv = root / "data" / "features" / "features.csv"
+    features_csv = paths.features_dir / "features.csv"
     features_df = pd.read_csv(features_csv)
 
     x, y, strata, feature_cols = _prepare_xy(features_df)
@@ -318,7 +328,7 @@ def main() -> None:
         ascending=[False, False, True, True],
     )
 
-    reports_dir = root / "reports"
+    reports_dir = paths.reports_dir
     reports_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(all_repeat_rows).to_csv(reports_dir / "sota_repeats.csv", index=False)
     leaderboard.to_csv(reports_dir / "model_leaderboard.csv", index=False)
@@ -372,7 +382,7 @@ def main() -> None:
         re_rows=re_rows,
     )
 
-    models_dir = root / "models"
+    models_dir = paths.models_dir
     models_dir.mkdir(parents=True, exist_ok=True)
     model_path = models_dir / "sota.pkl"
     with model_path.open("wb") as handle:

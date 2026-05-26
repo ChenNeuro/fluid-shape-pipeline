@@ -19,14 +19,59 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SMOKE_CONFIG = REPO_ROOT / "configs" / "wake_field_smoke.yaml"
 
 
-def _run_smoke_pipeline(temp_root: Path) -> None:
+def _run_smoke_pipeline(temp_root: Path, run_dir: Path) -> None:
     env = dict(os.environ)
     env["FLUID_SHAPE_PIPELINE_ROOT"] = str(temp_root)
     commands = [
-        [sys.executable, "-m", "sim.generate_dataset", "--config", str(SMOKE_CONFIG)],
-        [sys.executable, "-m", "extract.build_wake_fields", "--config", str(SMOKE_CONFIG)],
-        [sys.executable, "-m", "ml.train_wake", "--config", str(SMOKE_CONFIG)],
-        [sys.executable, "-m", "ml.reconstruct_wake", "--config", str(SMOKE_CONFIG)],
+        [
+            sys.executable,
+            "-m",
+            "sim.generate_dataset",
+            "--config",
+            str(SMOKE_CONFIG),
+            "--run-dir",
+            str(run_dir),
+        ],
+        [
+            sys.executable,
+            "-m",
+            "extract.build_wake_fields",
+            "--config",
+            str(SMOKE_CONFIG),
+            "--run-dir",
+            str(run_dir),
+        ],
+        [
+            sys.executable,
+            "-m",
+            "ml.audit_wake_leakage",
+            "--config",
+            str(SMOKE_CONFIG),
+            "--run-dir",
+            str(run_dir),
+            "--n-estimators",
+            "20",
+        ],
+        [
+            sys.executable,
+            "-m",
+            "ml.train_wake",
+            "--config",
+            str(SMOKE_CONFIG),
+            "--run-dir",
+            str(run_dir),
+        ],
+        [
+            sys.executable,
+            "-m",
+            "ml.reconstruct_wake",
+            "--config",
+            str(SMOKE_CONFIG),
+            "--run-dir",
+            str(run_dir),
+            "--run-name",
+            "resnet18",
+        ],
     ]
 
     for cmd in commands:
@@ -37,17 +82,18 @@ class WakePipelineSmokeTest(unittest.TestCase):
     def test_end_to_end_smoke_pipeline(self) -> None:
         with tempfile.TemporaryDirectory(prefix="wake-pipeline-smoke-") as tmpdir:
             temp_root = Path(tmpdir)
-            _run_smoke_pipeline(temp_root)
+            run_dir = temp_root / "runs" / "wake-smoke"
+            _run_smoke_pipeline(temp_root, run_dir)
 
-            manifest_path = temp_root / "data" / "raw" / "manifest.csv"
+            manifest_path = run_dir / "data" / "raw" / "manifest.csv"
             self.assertTrue(manifest_path.exists(), manifest_path)
 
-            wake_index_path = temp_root / "data" / "wake_fields" / "index.csv"
+            wake_index_path = run_dir / "data" / "wake_fields" / "index.csv"
             self.assertTrue(wake_index_path.exists(), wake_index_path)
 
             wake_index = pd.read_csv(wake_index_path).sort_values("case_id").reset_index(drop=True)
             first_case_id = str(wake_index.loc[0, "case_id"])
-            case_dir = temp_root / "data" / "raw" / first_case_id
+            case_dir = run_dir / "data" / "raw" / first_case_id
 
             frames_path = case_dir / "wake_frames.npz"
             field_path = case_dir / "wake_field.npz"
@@ -79,24 +125,31 @@ class WakePipelineSmokeTest(unittest.TestCase):
                 self.assertLessEqual(box[2], 1.0)
                 self.assertLessEqual(box[3], 1.0)
 
-            model_names = {path.name for path in (temp_root / "models").iterdir()}
+            model_names = {path.name for path in (run_dir / "models" / "resnet18").iterdir()}
             self.assertEqual(model_names, {"wake_field_main.pt", "wake_field_single.pt"})
 
             selection_payload = json.loads(
-                (temp_root / "reports" / "wake_field_selection.json").read_text(encoding="utf-8")
+                (run_dir / "reports" / "resnet18" / "wake_field_selection.json").read_text(
+                    encoding="utf-8"
+                )
             )
             self.assertEqual(selection_payload["main_variant"], "dist_multi_4ch")
             self.assertIsNone(selection_payload["speed_variant"])
 
-            summary_text = (temp_root / "reports" / "wake_field_summary.md").read_text(
+            summary_text = (run_dir / "reports" / "resnet18" / "wake_field_summary.md").read_text(
                 encoding="utf-8"
             )
             self.assertIn("dist_single_4ch", summary_text)
             self.assertNotIn("dist_only_4ch", summary_text)
 
-            self.assertTrue((temp_root / "reports" / "wake_field_summary.md").exists())
+            audit_text = (run_dir / "reports" / "wake_leakage_audit.md").read_text(encoding="utf-8")
+            self.assertIn("case_id_prefix_oracle", audit_text)
+            self.assertTrue((run_dir / "reports" / "wake_leakage_audit.csv").exists())
+
+            self.assertTrue((run_dir / "manifest.json").exists())
+            self.assertTrue((run_dir / "reports" / "resnet18" / "wake_field_summary.md").exists())
             self.assertTrue(
-                (temp_root / "reports" / "wake_field_reconstruction_summary.md").exists()
+                (run_dir / "reports" / "resnet18" / "wake_field_reconstruction_summary.md").exists()
             )
 
     def test_distance_crop_uses_physical_channel_height(self) -> None:

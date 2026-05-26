@@ -18,7 +18,8 @@ from ml.reconstruct import (
     _prepare_xy,
     _render_from_predicted_params,
 )
-from sim.config import load_config, repo_root
+from sim.config import load_config
+from sim.experiment import experiment_paths, write_run_manifest
 from sim.logging_utils import setup_logger
 
 
@@ -31,6 +32,11 @@ def parse_args() -> argparse.Namespace:
         "--n_perm", type=int, default=30, help="Number of target-permutation trials"
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed for audit")
+    parser.add_argument(
+        "--run-dir",
+        default=None,
+        help="Experiment output directory. Defaults to runs/<config-name>.",
+    )
     return parser.parse_args()
 
 
@@ -158,21 +164,26 @@ def _write_report(
     lines.append("")
     lines.append("## Main Comparison")
     lines.append(
-        f"- Observed reconstruction: IoU={observed['iou']:.4f}, Dice={observed['dice']:.4f}, mIoU3={observed['miou3']:.4f}"
+        f"- Observed reconstruction: IoU={observed['iou']:.4f}, "
+        f"Dice={observed['dice']:.4f}, mIoU3={observed['miou3']:.4f}"
     )
     lines.append(
-        f"- Random-pair control: IoU={random_pair['iou']:.4f}, Dice={random_pair['dice']:.4f}, mIoU3={random_pair['miou3']:.4f}"
+        f"- Random-pair control: IoU={random_pair['iou']:.4f}, "
+        f"Dice={random_pair['dice']:.4f}, mIoU3={random_pair['miou3']:.4f}"
     )
     lines.append(
-        f"- 1-NN template baseline: IoU={nn_metrics['iou']:.4f}, Dice={nn_metrics['dice']:.4f}, mIoU3={nn_metrics['miou3']:.4f}"
+        f"- 1-NN template baseline: IoU={nn_metrics['iou']:.4f}, "
+        f"Dice={nn_metrics['dice']:.4f}, mIoU3={nn_metrics['miou3']:.4f}"
     )
     lines.append("")
     lines.append("## Permutation Test (H0: input-target mapping is random)")
     lines.append(
-        f"- Null IoU mean±std: {null_df['iou'].mean():.4f} ± {null_df['iou'].std(ddof=0):.4f}; p-value={p_iou:.6f}"
+        f"- Null IoU mean±std: {null_df['iou'].mean():.4f} ± "
+        f"{null_df['iou'].std(ddof=0):.4f}; p-value={p_iou:.6f}"
     )
     lines.append(
-        f"- Null mIoU3 mean±std: {null_df['miou3'].mean():.4f} ± {null_df['miou3'].std(ddof=0):.4f}; p-value={p_miou3:.6f}"
+        f"- Null mIoU3 mean±std: {null_df['miou3'].mean():.4f} ± "
+        f"{null_df['miou3'].std(ddof=0):.4f}; p-value={p_miou3:.6f}"
     )
     lines.append("")
     lines.append("## Duplicate-Like Risk")
@@ -201,10 +212,17 @@ def _write_report(
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
-    root = repo_root()
-    logger = setup_logger("audit", root / "logs" / "audit.log")
+    paths = experiment_paths(cfg, config_path=args.config, run_dir=args.run_dir)
+    write_run_manifest(
+        paths=paths,
+        cfg=cfg,
+        config_path=args.config,
+        stage="audit_shortcut",
+        extra={"n_perm": args.n_perm, "seed": args.seed},
+    )
+    logger = setup_logger("audit", paths.logs_dir / "audit.log")
 
-    features_path = root / "data" / "features" / "features.csv"
+    features_path = paths.features_dir / "features.csv"
     if not features_path.exists():
         raise FileNotFoundError(
             f"Missing {features_path}. Run dataset and feature extraction first."
@@ -289,7 +307,7 @@ def main() -> None:
         (1.0 + np.sum(null_df["miou3"].to_numpy() >= observed["miou3"])) / (len(null_df) + 1.0)
     )
 
-    reports_dir = root / "reports"
+    reports_dir = paths.reports_dir
     reports_dir.mkdir(parents=True, exist_ok=True)
 
     null_csv = reports_dir / "pattern_audit_null.csv"

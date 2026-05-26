@@ -50,7 +50,7 @@ def build_case_specs(cfg: dict) -> list[CaseSpec]:
                     eps = 0.0
 
                 case_seed = int(rng.integers(0, 2**31 - 1))
-                case_id = f"{shape}_Re{re}_p{sample_idx:02d}"
+                case_id = f"{shape}_Re{re}_p{sample_idx:03d}"
                 cases.append(
                     CaseSpec(
                         case_id=case_id,

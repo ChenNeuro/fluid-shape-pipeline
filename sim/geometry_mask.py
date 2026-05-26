@@ -57,22 +57,47 @@ def _diamond_mask(
     return (np.abs(px - cx) / (half_dx + 1e-12) + np.abs(py - cy) / (half_dy + 1e-12)) <= 1.0
 
 
+# equal-area multipliers: all shapes have the same cross-sectional area
+# A = beta * H = 0.05 m^2 (blockage ratio 5%) when d = d_ratio * H = 0.2
+# circle: r = 0.6308*d  -> A = pi*(0.6308*d)^2 = 0.05
+# triangle: side = 1.699*d -> A = sqrt3/4*(1.699*d)^2 = 0.05
+# airfoil (NACA0014): chord = 3.6103*d -> A = chord^2 * 0.0959 = 0.05
+# diamond: half_dx=0.96*d, half_dy=0.651*d -> A = 2*half_dx*half_dy = 0.05
+# bar: half_w=1.141*d, half_h=0.274*d -> A = 4*half_w*half_h = 0.05
+_EQ_AREA_CIRCLE_R = 0.6308
+_EQ_AREA_TRI_SIDE = 1.699
+_EQ_AREA_AIRFOIL_CHORD = 3.6103
+_EQ_AREA_DIAMOND_DX = 0.96
+_EQ_AREA_DIAMOND_DY = 0.651
+_EQ_AREA_BAR_W = 1.141
+_EQ_AREA_BAR_H = 0.274
+
+
 def obstacle_mask(
     px: np.ndarray, py: np.ndarray, shape: str, cx: float, cy: float, d: float
 ) -> np.ndarray:
+    """Generate binary obstacle mask with equal cross-sectional area for all shapes.
+
+    All shapes have the same area A = beta * H when d = d_ratio * H.
+    See block comment above for the per-shape multipliers.
+    """
     if shape == "circle":
-        r = 0.5 * d
+        r = _EQ_AREA_CIRCLE_R * d
         return (px - cx) ** 2 + (py - cy) ** 2 <= r**2
     if shape == "square":
         return (np.abs(px - cx) <= 0.5 * d) & (np.abs(py - cy) <= 0.5 * d)
     if shape == "triangle":
-        return _triangle_mask(px, py, cx=cx, cy=cy, side=d)
+        return _triangle_mask(px, py, cx=cx, cy=cy, side=_EQ_AREA_TRI_SIDE * d)
     if shape == "airfoil":
-        return _airfoil_mask(px, py, cx=cx, cy=cy, chord=d, thickness_ratio=0.14)
+        return _airfoil_mask(
+            px, py, cx=cx, cy=cy, chord=_EQ_AREA_AIRFOIL_CHORD * d, thickness_ratio=0.14
+        )
     if shape == "diamond":
-        return _diamond_mask(px, py, cx=cx, cy=cy, half_dx=0.56 * d, half_dy=0.38 * d)
+        return _diamond_mask(
+            px, py, cx=cx, cy=cy, half_dx=_EQ_AREA_DIAMOND_DX * d, half_dy=_EQ_AREA_DIAMOND_DY * d
+        )
     if shape == "bar":
-        return (np.abs(px - cx) <= 0.75 * d) & (np.abs(py - cy) <= 0.18 * d)
+        return (np.abs(px - cx) <= _EQ_AREA_BAR_W * d) & (np.abs(py - cy) <= _EQ_AREA_BAR_H * d)
     raise ValueError(f"Unsupported shape: {shape}")
 
 

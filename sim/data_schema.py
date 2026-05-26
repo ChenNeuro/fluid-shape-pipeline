@@ -35,7 +35,8 @@ def find_metadata_json(case_dir: Path) -> Path:
         return legacy
 
     raise FileNotFoundError(
-        f"No metadata file found in {case_dir}. Expected {METADATA_FILENAME} or {LEGACY_METADATA_FILENAME}."
+        f"No metadata file found in {case_dir}. Expected {METADATA_FILENAME} "
+        f"or {LEGACY_METADATA_FILENAME}."
     )
 
 

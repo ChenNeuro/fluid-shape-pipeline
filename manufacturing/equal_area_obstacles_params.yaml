@@ -1,0 +1,110 @@
+# Equal-Area Obstacle Cross-Sections for Wake Flow Experiments
+# Design: blockage ratio beta = 5%, channel height H = 1.0 m
+# Target area: A = beta * H = 0.0500 m^2 = 50,000 mm^2 for all shapes
+# Equivalent diameter: D_eq = sqrt(4A/pi) = 252.3 mm
+# 5-class problem: circle, triangle, airfoil, diamond, bar
+# Coordinate system: origin at shape center, x = streamwise, y = spanwise
+
+# ============================================================
+# 1. CIRCLE
+# ============================================================
+shape: circle
+area_mm2: 50000.0
+diameter_mm: 252.3
+radius_mm: 126.2
+
+# Circle boundary (parametric, 100 points):
+# x = 126.2 * cos(theta), y = 126.2 * sin(theta), theta in [0, 2*pi]
+
+
+# ============================================================
+# 2. EQUILATERAL TRIANGLE (pointing upstream, apex at x<0)
+# ============================================================
+shape: triangle
+area_mm2: 50000.0
+side_mm: 339.8
+height_mm: 294.3
+
+# Vertices:
+# Apex (upstream):    (-196.2, 0.0)
+# Base left:          (98.1, -147.2)
+# Base right:         (98.1, 147.2)
+
+
+# ============================================================
+# 3. NACA 0014 SYMMETRIC AIRFOIL
+# ============================================================
+shape: airfoil
+profile: NACA0014_symmetric
+area_mm2: 50000.0
+chord_mm: 722.1
+max_thickness_mm: 101.1
+thickness_ratio: 0.14
+leading_edge: (-361.0, 0.0)
+trailing_edge: (361.0, 0.0)
+
+# Upper/lower surface coordinates (x, y) in mm:
+# xr = (x + 361.0) / 722.1   # normalized chord coordinate [0, 1]
+# yt = 5 * 0.14 * (0.2969*sqrt(xr) - 0.1260*xr - 0.3516*xr^2 + 0.2843*xr^3 - 0.1015*xr^4)
+# y_upper = +yt * 722.1
+# y_lower = -yt * 722.1
+
+# Sample points (x, y_upper) in mm:
+# LE:  (-361.00,   0.00)
+# 10%: (-288.83,  50.05)
+# 20%: (-216.66,  70.00)
+# 30%: (-144.49,  84.97)
+# 40%:  (-72.32,  95.19)
+# 50%:   (  0.00, 101.09)  <- max thickness
+# 60%:   ( 72.32, 101.97)
+# 70%:  (144.49,  96.73)
+# 80%:  (216.66,  84.32)
+# 90%:  (288.83,  62.14)
+# TE:   (361.00,   0.00)
+
+
+# ============================================================
+# 4. DIAMOND (RHOMBUS)
+# ============================================================
+shape: diamond
+area_mm2: 50000.0
+horizontal_diagonal_mm: 383.9   # width in x (streamwise)
+vertical_diagonal_mm: 260.5    # height in y (spanwise)
+aspect_ratio: 1.474            # w/h
+edge_length_mm: 231.6
+
+# Vertices (counter-clockwise from left point):
+# Left:   (-191.95, 0.00)
+# Top:    (0.00, 130.25)
+# Right:  (191.95, 0.00)
+# Bottom: (0.00, -130.25)
+
+
+# ============================================================
+# 5. BAR (RECTANGLE / FLAT PLATE)
+# ============================================================
+shape: bar
+area_mm2: 50000.0
+width_mm: 456.5      # streamwise length (x)
+height_mm: 109.5     # spanwise thickness (y)
+aspect_ratio: 4.167  # w/h
+
+# Vertices (counter-clockwise from bottom-left):
+# (-228.25, -54.75) -> (228.25, -54.75) -> (228.25, 54.75) -> (-228.25, 54.75)
+
+
+# ============================================================
+# SUMMARY TABLE
+# ============================================================
+# Shape     | Key Dim 1       | Key Dim 2      | Area (mm^2)
+# ----------|-----------------|-----------------|-----------
+# Circle    | D = 252.3 mm    | --              | 50,000
+# Triangle  | a = 339.8 mm    | h = 294.3 mm    | 50,000
+# Airfoil   | c = 722.1 mm    | t = 101.1 mm    | 50,000
+# Diamond   | w = 383.9 mm    | h = 260.5 mm    | 50,000
+# Bar       | w = 456.5 mm    | h = 109.5 mm    | 50,000
+
+# Material: [TO BE FILLED - e.g., acrylic, aluminum, stainless steel]
+# Thickness (spanwise / 3D depth): [TO BE FILLED - e.g., 10 mm for 2D spanwise]
+# Surface finish: [TO BE FILLED]
+# Mounting: [TO BE FILLED - e.g., center hole for support rod]

@@ -113,7 +113,6 @@ def build_distance_crop_box(
     """
     # x: start at canvas_x_start + downstream_h * H, end at canvas_x_end
     x_start_phys = canvas_x_start + downstream_h * physical_h
-    x_end_phys = canvas_x_end
     x0_norm = np.clip((x_start_phys - canvas_x_start) / (canvas_x_end - canvas_x_start), 0.0, 1.0)
     x1_norm = 1.0  # always extend to right edge of canvas
 

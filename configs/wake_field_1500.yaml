@@ -1,11 +1,11 @@
 project:
-  seed: 20260303
+  seed: 20260501
   solver: synthetic
   modality: wake_field
 
 simulation:
   H: 1.0
-  d_ratio: 0.2   # reference length for wake generation; equal-area masks apply beta=5% multipliers
+  d_ratio: 0.2   # reference length; equal-area masks apply beta=5% multipliers
   x0: 3.0
   y0: 0.5
   L_in: 5.0
@@ -14,9 +14,9 @@ simulation:
   U_mean: 1.0
   re_values: [100, 200, 300]
   shapes: [circle, triangle, airfoil, diamond, bar]
-  perturbations_per_combo: 30
+  perturbations_per_combo: 100
   probes_n: 32
-  workers: 8
+  workers: 16
   max_retries: 2
 
   perturb:
@@ -108,7 +108,7 @@ vision:
   flow_estimator: farneback
   scales: [dist0.5_full, dist1.0_full, dist2.0_full]
   training:
-    epochs: 50
+    epochs: 80
     batch_size: 16
     lr: 0.0008
     weight_decay: 0.0001
@@ -119,11 +119,11 @@ vision:
       shape: 1.0
       params: 0.5
       re: 0.2
-    early_stopping_patience: 10
+    early_stopping_patience: 15
     val_ratio: 0.1
     scheduler:
       type: cosine
-      T_max: 50
+      T_max: 80
     augmentation:
       enabled: true
       random_vertical_flip: 0.0
@@ -140,18 +140,18 @@ vision:
     dropout: 0.2
   jepa:
     batch_size: 16
-    pretrain_epochs: 30
+    pretrain_epochs: 60
     lr: 0.001
-    feature_dim: 192
+    feature_dim: 256
     mask_ratio: 0.3
     block_size: 8
     momentum: 0.996
     proj_dim: 128
-    fine_tune_epochs: 30
+    fine_tune_epochs: 50
     fine_tune_lr: 0.0005
-    fusion_hidden: 192
+    fusion_hidden: 256
     dropout: 0.15
-    early_stopping_patience: 10
+    early_stopping_patience: 15
     loss_weights:
       shape: 1.0
       params: 0.5

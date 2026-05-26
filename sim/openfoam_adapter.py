@@ -112,7 +112,10 @@ class OpenFOAMSimulator:
             "dy": float(case_spec.dy),
             "eps": float(case_spec.eps),
             "seed": int(case_spec.seed),
-            "note": "Geometry perturbation hooks are prepared in this adapter. Extend mesh generation scripts for exact obstacle/lens geometry.",
+            "note": (
+                "Geometry perturbation hooks are prepared in this adapter. "
+                "Extend mesh generation scripts for exact obstacle/lens geometry."
+            ),
         }
         with (work_dir / "case_params.json").open("w", encoding="utf-8") as handle:
             json.dump(metadata, handle, indent=2)

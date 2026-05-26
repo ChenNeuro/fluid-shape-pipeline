@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -21,9 +22,11 @@ class WakeBundle:
     crops_by_scale: dict[str, np.ndarray]
 
 
-def load_wake_bundle() -> WakeBundle:
-    root = repo_root()
-    index_path = root / "data" / "wake_fields" / "index.csv"
+def load_wake_bundle(wake_fields_dir: str | Path | None = None) -> WakeBundle:
+    if wake_fields_dir is None:
+        index_path = repo_root() / "data" / "wake_fields" / "index.csv"
+    else:
+        index_path = Path(wake_fields_dir).expanduser().resolve() / "index.csv"
     if not index_path.exists():
         raise FileNotFoundError(
             f"Missing wake-field index: {index_path}. Run build_wake_fields first."
@@ -47,14 +50,16 @@ def load_wake_bundle() -> WakeBundle:
             scale_names = case_scales
         elif case_scales != scale_names:
             raise RuntimeError(
-                f"Inconsistent scale names for case {row['case_id']}: {case_scales} != {scale_names}"
+                f"Inconsistent scale names for case {row['case_id']}: "
+                f"{case_scales} != {scale_names}"
             )
 
         if channel_names is None:
             channel_names = case_channels
         elif case_channels != channel_names:
             raise RuntimeError(
-                f"Inconsistent channel names for case {row['case_id']}: {case_channels} != {channel_names}"
+                f"Inconsistent channel names for case {row['case_id']}: "
+                f"{case_channels} != {channel_names}"
             )
 
         for idx, scale in enumerate(case_scales):

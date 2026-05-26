@@ -9,8 +9,9 @@ from pathlib import Path
 import pandas as pd
 
 from sim.case_builder import CaseSpec, build_case_specs
-from sim.config import load_config, repo_root
+from sim.config import load_config
 from sim.data_schema import find_metadata_json
+from sim.experiment import experiment_paths, write_run_manifest
 from sim.logging_utils import setup_logger
 from sim.solvers import build_simulator
 
@@ -26,6 +27,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--workers", type=int, default=None, help="Number of parallel workers (0/1 for sequential)"
+    )
+    parser.add_argument(
+        "--run-dir",
+        default=None,
+        help="Experiment output directory. Defaults to runs/<config-name>.",
     )
     return parser.parse_args()
 
@@ -129,14 +135,15 @@ def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
 
-    root = repo_root()
-    logger = setup_logger("dataset", root / "logs" / "dataset.log")
+    paths = experiment_paths(cfg, config_path=args.config, run_dir=args.run_dir)
+    write_run_manifest(paths=paths, cfg=cfg, config_path=args.config, stage="dataset")
+    logger = setup_logger("dataset", paths.logs_dir / "dataset.log")
 
     solver_name = args.solver or cfg["project"].get("solver", "synthetic")
     workers = args.workers if args.workers is not None else int(cfg["simulation"].get("workers", 0))
     max_retries = int(cfg["simulation"].get("max_retries", 1))
 
-    raw_root = root / "data" / "raw"
+    raw_root = paths.raw_dir
     raw_root.mkdir(parents=True, exist_ok=True)
 
     case_specs = build_case_specs(cfg)

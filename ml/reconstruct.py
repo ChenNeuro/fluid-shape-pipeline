@@ -14,7 +14,8 @@ from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-from sim.config import load_config, repo_root
+from sim.config import load_config
+from sim.experiment import experiment_paths, write_run_manifest
 from sim.geometry_mask import render_case_image
 from sim.logging_utils import setup_logger
 
@@ -25,6 +26,11 @@ RECON_METHODS = {"latent_ridge", "parametric_inverse"}
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Reconstruct geometry images from probe features")
     parser.add_argument("--config", default="configs/default.yaml", help="Path to YAML config")
+    parser.add_argument(
+        "--run-dir",
+        default=None,
+        help="Experiment output directory. Defaults to runs/<config-name>.",
+    )
     return parser.parse_args()
 
 
@@ -503,15 +509,18 @@ def _write_sanity_report(
     lines.append("")
     lines.append("## Aligned vs Random-Pair Control")
     lines.append(
-        f"- Obstacle IoU: aligned={aligned_metrics['iou']:.4f}, random_pair={random_metrics['iou']:.4f}, "
+        f"- Obstacle IoU: aligned={aligned_metrics['iou']:.4f}, "
+        f"random_pair={random_metrics['iou']:.4f}, "
         f"delta={aligned_metrics['iou'] - random_metrics['iou']:.4f}"
     )
     lines.append(
-        f"- Obstacle Dice: aligned={aligned_metrics['dice']:.4f}, random_pair={random_metrics['dice']:.4f}, "
+        f"- Obstacle Dice: aligned={aligned_metrics['dice']:.4f}, "
+        f"random_pair={random_metrics['dice']:.4f}, "
         f"delta={aligned_metrics['dice'] - random_metrics['dice']:.4f}"
     )
     lines.append(
-        f"- Geometry mIoU(3-class): aligned={aligned_metrics['miou3']:.4f}, random_pair={random_metrics['miou3']:.4f}, "
+        f"- Geometry mIoU(3-class): aligned={aligned_metrics['miou3']:.4f}, "
+        f"random_pair={random_metrics['miou3']:.4f}, "
         f"delta={aligned_metrics['miou3'] - random_metrics['miou3']:.4f}"
     )
     lines.append("")
@@ -667,7 +676,8 @@ def _write_summary(
     lines.append("## Leave-One-Re-Out (Selected Method)")
     for row in re_rows:
         lines.append(
-            f"- Re={row['Re_test']} (n={row['n_test']}): MSE={row['mse']:.6f}, IoU={row['iou']:.4f}, "
+            f"- Re={row['Re_test']} (n={row['n_test']}): "
+            f"MSE={row['mse']:.6f}, IoU={row['iou']:.4f}, "
             f"Dice={row['dice']:.4f}, mIoU3={row['miou3']:.4f}, shape_acc={row['shape_acc']:.4f}, "
             f"dy_MAE={row['dy_mae']:.5f}, eps_MAE={row['eps_mae']:.5f}"
         )
@@ -677,10 +687,11 @@ def _write_summary(
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
-    root = repo_root()
-    logger = setup_logger("reconstruct", root / "logs" / "reconstruct.log")
+    paths = experiment_paths(cfg, config_path=args.config, run_dir=args.run_dir)
+    write_run_manifest(paths=paths, cfg=cfg, config_path=args.config, stage="reconstruct")
+    logger = setup_logger("reconstruct", paths.logs_dir / "reconstruct.log")
 
-    features_path = root / "data" / "features" / "features.csv"
+    features_path = paths.features_dir / "features.csv"
     if not features_path.exists():
         raise FileNotFoundError(f"Missing {features_path}. Run make dataset first.")
 
@@ -780,7 +791,7 @@ def main() -> None:
                 }
             )
 
-    reports_dir = root / "reports"
+    reports_dir = paths.reports_dir
     reports_dir.mkdir(parents=True, exist_ok=True)
     repeat_df = pd.DataFrame(repeat_rows).sort_values(["method", "seed"])
     repeat_df.to_csv(reports_dir / "reconstruction_repeats.csv", index=False)
@@ -957,7 +968,7 @@ def main() -> None:
         re_rows=re_rows,
     )
 
-    models_dir = root / "models"
+    models_dir = paths.models_dir
     models_dir.mkdir(parents=True, exist_ok=True)
     model_path = models_dir / "reconstructor.pkl"
 

@@ -5,8 +5,9 @@ import argparse
 import pandas as pd
 
 from extract.feature_engineering import extract_features_from_df
-from sim.config import load_config, repo_root
+from sim.config import load_config
 from sim.data_schema import find_probes_csv
+from sim.experiment import experiment_paths, write_run_manifest
 from sim.logging_utils import setup_logger
 
 
@@ -15,17 +16,23 @@ def parse_args() -> argparse.Namespace:
         description="Extract fixed-length features from raw probe signals"
     )
     parser.add_argument("--config", default="configs/default.yaml", help="Path to YAML config")
+    parser.add_argument(
+        "--run-dir",
+        default=None,
+        help="Experiment output directory. Defaults to runs/<config-name>.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
-    root = repo_root()
+    paths = experiment_paths(cfg, config_path=args.config, run_dir=args.run_dir)
+    write_run_manifest(paths=paths, cfg=cfg, config_path=args.config, stage="features")
 
-    logger = setup_logger("features", root / "logs" / "features.log")
+    logger = setup_logger("features", paths.logs_dir / "features.log")
 
-    manifest_path = root / "data" / "raw" / "manifest.csv"
+    manifest_path = paths.raw_dir / "manifest.csv"
     if not manifest_path.exists():
         raise FileNotFoundError(
             f"Manifest not found: {manifest_path}. Run dataset generation first."
@@ -44,7 +51,7 @@ def main() -> None:
     rows = []
     for _, item in ok_cases.iterrows():
         case_id = item["case_id"]
-        case_dir = root / "data" / "raw" / case_id
+        case_dir = paths.raw_dir / case_id
         try:
             raw_csv = find_probes_csv(case_dir)
         except FileNotFoundError:
@@ -75,7 +82,7 @@ def main() -> None:
         raise RuntimeError("Feature extraction produced no rows")
 
     features_df = pd.DataFrame(rows).sort_values("case_id").reset_index(drop=True)
-    feat_dir = root / "data" / "features"
+    feat_dir = paths.features_dir
     feat_dir.mkdir(parents=True, exist_ok=True)
     output_csv = feat_dir / "features.csv"
     features_df.to_csv(output_csv, index=False)
