@@ -8,6 +8,8 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from vision.wake_model import MultiScaleWakeNet, compute_multitask_loss
 
+HistoryEntry = dict[str, float | str]
+
 
 def set_seed(seed: int) -> None:
     np.random.seed(seed)
@@ -84,11 +86,11 @@ def _run_supervised_epochs(
     loss_weights: dict,
     aug_cfg: dict,
     patience: int,
-    history: list[dict[str, float]] | None = None,
+    history: list[HistoryEntry] | None = None,
     phase: str | int | None = None,
     epoch_offset: int = 0,
     max_grad_norm: float | None = None,
-) -> list[dict[str, float]]:
+) -> list[HistoryEntry]:
     history = [] if history is None else history
     best_val_loss = float("inf")
     epochs_no_improve = 0
@@ -129,7 +131,7 @@ def _run_supervised_epochs(
             loss_params += loss_parts["loss_params"] * batch_n
             loss_re += loss_parts["loss_re"] * batch_n
 
-        epoch_entry: dict[str, float] = {
+        epoch_entry: HistoryEntry = {
             "epoch": epoch_offset + epoch + 1,
             "loss_total": loss_total / max(n_items, 1),
             "loss_shape": loss_shape / max(n_items, 1),
@@ -221,7 +223,7 @@ def train_resnet_wake_model(
     n_shapes: int,
     n_re_classes: int,
     device: torch.device,
-) -> tuple[MultiScaleWakeNet, list[dict[str, float]]]:
+) -> tuple[MultiScaleWakeNet, list[HistoryEntry]]:
     train_cfg = cfg.get("vision", {}).get("training", {})
     batch_size = int(train_cfg.get("batch_size", 16))
     epochs = int(train_cfg.get("epochs", 8))
@@ -287,7 +289,7 @@ def train_vit_wake_model(
     n_shapes: int,
     n_re_classes: int,
     device: torch.device,
-) -> tuple[torch.nn.Module, list[dict[str, float]]]:
+) -> tuple[torch.nn.Module, list[HistoryEntry]]:
     from vision.mae_vit_model import MultiScaleViTWakeNet
 
     vit_cfg = cfg.get("vision", {}).get("mae_vit", {})
@@ -326,7 +328,7 @@ def train_vit_wake_model(
         batch_size=batch_size,
     )
 
-    history: list[dict[str, float]] = []
+    history: list[HistoryEntry] = []
     model.freeze_backbone()
     optimizer_p1 = torch.optim.AdamW(
         list(model.scale_proj.parameters())
@@ -389,7 +391,7 @@ def train_jepa_wake_model(
     n_shapes: int,
     n_re_classes: int,
     device: torch.device,
-) -> tuple[torch.nn.Module, list[dict[str, float]]]:
+) -> tuple[torch.nn.Module, list[HistoryEntry]]:
     from vision.jepa_encoder import IJEPAPretrainer, LightweightCNNEncoder
     from vision.wake_model import MultiScaleJEPAModel
 
@@ -398,19 +400,24 @@ def train_jepa_wake_model(
     pretrain_epochs = int(jepa_cfg.get("pretrain_epochs", 30))
     feature_dim = int(jepa_cfg.get("feature_dim", 192))
     ft_epochs = int(jepa_cfg.get("fine_tune_epochs", 30))
+    encoder_norm = str(jepa_cfg.get("encoder_norm", "batch"))
     scheduler_cfg = cfg.get("vision", {}).get("training", {}).get("scheduler", {})
 
     set_seed(seed)
     in_channels = int(x_train.shape[2])
     n_scales = x_train.shape[1]
-    crops_for_jepa = x_train.transpose(1, 0, 2, 3, 4).reshape(
+    crops_for_jepa_raw = x_train.transpose(1, 0, 2, 3, 4).reshape(
         -1, in_channels, x_train.shape[3], x_train.shape[4]
     )
-    crops_for_jepa = np.asarray(crops_for_jepa, dtype=np.float32)
+    crops_for_jepa = np.asarray(crops_for_jepa_raw, dtype=np.float32)
 
     jepa_dataset = TensorDataset(torch.from_numpy(crops_for_jepa).float())
     jepa_loader = DataLoader(jepa_dataset, batch_size=batch_size, shuffle=True)
-    encoder = LightweightCNNEncoder(in_channels=in_channels, feature_dim=feature_dim).to(device)
+    encoder = LightweightCNNEncoder(
+        in_channels=in_channels,
+        feature_dim=feature_dim,
+        norm=encoder_norm,
+    ).to(device)
     pretrainer = IJEPAPretrainer(
         encoder,
         feature_dim=feature_dim,
@@ -426,7 +433,7 @@ def train_jepa_wake_model(
     for param in pretrainer.predictor.parameters():
         pretrain_opt.add_param_group({"params": param})
 
-    history: list[dict[str, float]] = []
+    history: list[HistoryEntry] = []
     for epoch in range(pretrain_epochs):
         pretrainer.train()
         total_loss = 0.0
@@ -462,6 +469,7 @@ def train_jepa_wake_model(
         fusion_hidden=int(jepa_cfg.get("fusion_hidden", 192)),
         dropout=float(jepa_cfg.get("dropout", 0.15)),
         pretrained_encoder=jepa_encoder,
+        encoder_norm=encoder_norm,
     ).to(device)
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=float(jepa_cfg.get("fine_tune_lr", 0.0005)), weight_decay=1e-4
@@ -517,10 +525,11 @@ def train_smallcnn_wake_model(
     n_shapes: int,
     n_re_classes: int,
     device: torch.device,
-) -> tuple[torch.nn.Module, list[dict[str, float]]]:
+) -> tuple[torch.nn.Module, list[HistoryEntry]]:
     from vision.wake_model import MultiScaleJEPAModel
 
     train_cfg = cfg.get("vision", {}).get("training", {})
+    jepa_cfg = cfg.get("vision", {}).get("jepa", {})
     batch_size = int(train_cfg.get("batch_size", 16))
     epochs = int(train_cfg.get("epochs", 80))
     scheduler_cfg = train_cfg.get("scheduler", {})
@@ -531,9 +540,10 @@ def train_smallcnn_wake_model(
         in_channels=int(x_train.shape[2]),
         n_shapes=n_shapes,
         n_re_classes=n_re_classes,
-        feature_dim=int(cfg.get("vision", {}).get("jepa", {}).get("feature_dim", 192)),
+        feature_dim=int(jepa_cfg.get("feature_dim", 192)),
         fusion_hidden=int(train_cfg.get("fusion_hidden", 192)),
         dropout=float(train_cfg.get("dropout", 0.15)),
+        encoder_norm=str(jepa_cfg.get("encoder_norm", "batch")),
         pretrained_encoder=None,
     ).to(device)
     optimizer = torch.optim.AdamW(
@@ -587,7 +597,7 @@ def train_simsiam_wake_model(
     n_shapes: int,
     n_re_classes: int,
     device: torch.device,
-) -> tuple[torch.nn.Module, list[dict[str, float]]]:
+) -> tuple[torch.nn.Module, list[HistoryEntry]]:
     from vision.jepa_encoder import LightweightCNNEncoder
     from vision.simsiam_pretrainer import SimSiamPretrainer
     from vision.wake_model import MultiScaleJEPAModel
@@ -602,10 +612,10 @@ def train_simsiam_wake_model(
     set_seed(seed)
     in_channels = int(x_train.shape[2])
     n_scales = x_train.shape[1]
-    crops = x_train.transpose(1, 0, 2, 3, 4).reshape(
+    crops_raw = x_train.transpose(1, 0, 2, 3, 4).reshape(
         -1, in_channels, x_train.shape[3], x_train.shape[4]
     )
-    crops = np.asarray(crops, dtype=np.float32)
+    crops = np.asarray(crops_raw, dtype=np.float32)
     ssl_dataset = TensorDataset(torch.from_numpy(crops).float())
     ssl_loader = DataLoader(ssl_dataset, batch_size=batch_size, shuffle=True)
 
@@ -620,7 +630,7 @@ def train_simsiam_wake_model(
         lr=float(jepa_cfg.get("lr", 0.001)),
     )
 
-    history: list[dict[str, float]] = []
+    history: list[HistoryEntry] = []
     for epoch in range(pretrain_epochs):
         ssl_trainer.train()
         total_loss = 0.0
@@ -712,7 +722,7 @@ def train_wake_backbone(
     n_shapes: int,
     n_re_classes: int,
     device: torch.device,
-) -> tuple[torch.nn.Module, list[dict[str, float]]]:
+) -> tuple[torch.nn.Module, list[HistoryEntry]]:
     trainers = {
         "resnet18": train_resnet_wake_model,
         "mae_vit": train_vit_wake_model,
@@ -798,6 +808,13 @@ def save_model_pack(
                     model,
                     "dropout",
                     cfg.get("vision", {}).get("jepa", {}).get("dropout", 0.15),
+                )
+            ),
+            "encoder_norm": str(
+                getattr(
+                    model,
+                    "encoder_norm",
+                    cfg.get("vision", {}).get("jepa", {}).get("encoder_norm", "batch"),
                 )
             ),
         }

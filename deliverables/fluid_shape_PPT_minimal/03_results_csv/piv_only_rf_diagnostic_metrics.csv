@@ -1,0 +1,2 @@
+split,train_n,test_n,accuracy,macro_f1
+train_seq12_test_seq3,1800,900,0.7622222222222222,0.7461864637188752

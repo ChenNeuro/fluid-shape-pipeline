@@ -1,0 +1,144 @@
+project:
+  seed: 20260605
+  experiment_id: synth_tank_stl5000
+  solver: synthetic
+  modality: wake_field
+
+simulation:
+  H: 0.45
+  d_ratio: 0.1406
+  x0: 0.25
+  y0: 0.225
+  L_in: 0.25
+  L_out: 0.60
+  density: 997.0
+  U_mean: 1.0
+  re_values: [300, 800, 1500]
+  shapes: [circle, triangle, airfoil, diamond, bar]
+  perturbations_per_combo: 30
+  probes_n: 32
+  workers: 8
+  max_retries: 2
+
+  perturb:
+    enable_dy: true
+    dy_min: -0.033333333
+    dy_max: 0.033333333
+    enable_eps: true
+    eps_max: 0.03
+
+  time:
+    cfl_target: 0.5
+    dt: 0.01
+    transient_time: 8.0
+    transient_cycles: 8
+    min_cycles: 20
+    min_samples: 1600
+
+  synthetic:
+    noise_std: 0.040
+    shape_params:
+      circle:
+        st: 0.17
+        amp: 0.13
+        h2: 0.16
+        h3: 0.05
+        phase_gradient: 1.8
+      triangle:
+        st: 0.30
+        amp: 0.20
+        h2: 0.34
+        h3: 0.18
+        phase_gradient: 3.3
+      airfoil:
+        st: 0.11
+        amp: 0.09
+        h2: 0.08
+        h3: 0.03
+        phase_gradient: 1.2
+      diamond:
+        st: 0.24
+        amp: 0.18
+        h2: 0.42
+        h3: 0.27
+        phase_gradient: 2.8
+      bar:
+        st: 0.07
+        amp: 0.24
+        h2: 0.58
+        h3: 0.42
+        phase_gradient: 4.0
+    challenge:
+      enabled: true
+      freq_jitter_std: 0.10
+      amp_jitter_std: 0.18
+      noise_multiplier: 1.6
+      common_mode_amp: 0.08
+      common_mode_freq_ratio: 0.90
+      drift_amp: 0.04
+      drift_freq_ratio: 0.06
+      probe_mix: 0.18
+      dropout_prob: 0.006
+      dropout_std: 0.07
+
+openfoam:
+  template_dir: sim/templates/openfoam_case
+  case_root: runs/openfoam
+  mesh_cmds: [blockMesh]
+  solver_cmd: pimpleFoam
+  write_interval: 0.1
+
+features:
+  fft_bands: 6
+  pod_modes: 5
+  add_pod: true
+
+ml:
+  test_size: 0.2
+  random_state: 42
+  repeat_seeds: [40, 41, 42, 43, 44]
+  n_estimators: 500
+  cv_folds: 5
+  robustness_bins: 8
+  perm_repeats: 20
+
+vision:
+  sequence_frames: 8
+  field_size: 128
+  channels: [ux, uy, speed, vorticity]
+  flow_estimator: farneback
+  scales: [distD1.0_full, distD2.0_full, distD4.0_full]
+  training:
+    epochs: 50
+    batch_size: 16
+    lr: 0.0008
+    weight_decay: 0.0001
+    fusion_hidden: 256
+    dropout: 0.15
+    export_seed: 42
+    loss_weights:
+      shape: 1.0
+      params: 0.3
+      re: 0.2
+    early_stopping_patience: 10
+    val_ratio: 0.1
+    scheduler:
+      type: cosine
+      T_max: 50
+    augmentation:
+      enabled: true
+      random_vertical_flip: 0.0
+      random_noise_std: 0.02
+
+reconstruction:
+  image_height: 64
+  image_width: 128
+  methods: [parametric_inverse, latent_ridge]
+  param_n_estimators: 800
+  audit_n_estimators: 350
+  param_min_samples_leaf: 1
+  latent_dim: 64
+  ridge_alpha: 1.0
+  obstacle_threshold: 0.8
+  confidence_threshold: 0.45
+  repeat_seeds: [40, 41, 42, 43, 44]

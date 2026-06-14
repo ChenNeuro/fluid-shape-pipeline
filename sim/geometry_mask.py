@@ -18,7 +18,7 @@ def _triangle_mask(px: np.ndarray, py: np.ndarray, cx: float, cy: float, side: f
 
     has_neg = (d1 < 0.0) | (d2 < 0.0) | (d3 < 0.0)
     has_pos = (d1 > 0.0) | (d2 > 0.0) | (d3 > 0.0)
-    return ~(has_neg & has_pos)
+    return np.asarray(~(has_neg & has_pos))
 
 
 def _airfoil_mask(
@@ -57,13 +57,13 @@ def _diamond_mask(
     return (np.abs(px - cx) / (half_dx + 1e-12) + np.abs(py - cy) / (half_dy + 1e-12)) <= 1.0
 
 
-# equal-area multipliers: all shapes have the same cross-sectional area
-# A = beta * H = 0.05 m^2 (blockage ratio 5%) when d = d_ratio * H = 0.2
-# circle: r = 0.6308*d  -> A = pi*(0.6308*d)^2 = 0.05
-# triangle: side = 1.699*d -> A = sqrt3/4*(1.699*d)^2 = 0.05
-# airfoil (NACA0014): chord = 3.6103*d -> A = chord^2 * 0.0959 = 0.05
-# diamond: half_dx=0.96*d, half_dy=0.651*d -> A = 2*half_dx*half_dy = 0.05
-# bar: half_w=1.141*d, half_h=0.274*d -> A = 4*half_w*half_h = 0.05
+# equal-area multipliers: all shapes have the same in-plane area ratio A/H^2.
+# With d = d_ratio * H, these constants give A/H^2 ~= 0.05 when d_ratio = 0.2.
+# circle: r = 0.6308*d  -> A/H^2 = pi*(0.6308*d_ratio)^2
+# triangle: side = 1.699*d -> A/H^2 = sqrt3/4*(1.699*d_ratio)^2
+# airfoil (NACA0014): chord = 3.6103*d -> A/H^2 = 0.0959*(3.6103*d_ratio)^2
+# diamond: half_dx=0.96*d, half_dy=0.651*d -> A/H^2 = 2*0.96*0.651*d_ratio^2
+# bar: half_w=1.141*d, half_h=0.274*d -> A/H^2 = 4*1.141*0.274*d_ratio^2
 _EQ_AREA_CIRCLE_R = 0.6308
 _EQ_AREA_TRI_SIDE = 1.699
 _EQ_AREA_AIRFOIL_CHORD = 3.6103
@@ -78,7 +78,7 @@ def obstacle_mask(
 ) -> np.ndarray:
     """Generate binary obstacle mask with equal cross-sectional area for all shapes.
 
-    All shapes have the same area A = beta * H when d = d_ratio * H.
+    All shapes have the same area ratio A/H^2 for a given d_ratio.
     See block comment above for the per-shape multipliers.
     """
     if shape == "circle":

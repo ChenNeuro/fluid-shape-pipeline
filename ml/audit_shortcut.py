@@ -23,6 +23,12 @@ from sim.experiment import experiment_paths, write_run_manifest
 from sim.logging_utils import setup_logger
 
 
+def _scalar_metrics(metrics: dict[str, float | np.ndarray]) -> dict[str, float]:
+    return {
+        key: float(value) for key, value in metrics.items() if not isinstance(value, np.ndarray)
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Audit possible pattern-matching shortcuts in reconstruction"
@@ -101,7 +107,9 @@ def _random_pair_metrics(
 ) -> dict[str, float]:
     rng = np.random.default_rng(seed)
     perm = rng.permutation(y_true.shape[0])
-    return _evaluate_prediction(y_true=y_true[perm], y_pred=y_pred, threshold=threshold)
+    return _scalar_metrics(
+        _evaluate_prediction(y_true=y_true[perm], y_pred=y_pred, threshold=threshold)
+    )
 
 
 def _nearest_neighbor_baseline(
@@ -122,7 +130,9 @@ def _nearest_neighbor_baseline(
     dists = dists.reshape(-1)
 
     y_pred = y_train[idx]
-    metrics = _evaluate_prediction(y_true=y_test, y_pred=y_pred, threshold=threshold)
+    metrics = _scalar_metrics(
+        _evaluate_prediction(y_true=y_test, y_pred=y_pred, threshold=threshold)
+    )
     metrics["dup_like_rate"] = float(np.mean(dists < 1e-9))
     metrics["nn_dist_mean"] = float(np.mean(dists))
     metrics["nn_dist_p05"] = float(np.quantile(dists, 0.05))
@@ -261,7 +271,9 @@ def main() -> None:
         cfg=cfg,
         seed=int(args.seed),
     )
-    observed = _evaluate_prediction(y_true=y_test, y_pred=y_pred, threshold=threshold)
+    observed = _scalar_metrics(
+        _evaluate_prediction(y_true=y_test, y_pred=y_pred, threshold=threshold)
+    )
     random_pair = _random_pair_metrics(
         y_true=y_test, y_pred=y_pred, threshold=threshold, seed=int(args.seed) + 1
     )
@@ -288,7 +300,9 @@ def main() -> None:
             cfg=cfg,
             seed=int(args.seed) + 100 + i,
         )
-        m = _evaluate_prediction(y_true=y_test, y_pred=y_perm_pred, threshold=threshold)
+        m = _scalar_metrics(
+            _evaluate_prediction(y_true=y_test, y_pred=y_perm_pred, threshold=threshold)
+        )
         null_rows.append(
             {
                 "perm_idx": int(i),

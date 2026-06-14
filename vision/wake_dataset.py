@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -84,7 +85,12 @@ def load_wake_bundle(wake_fields_dir: str | Path | None = None) -> WakeBundle:
     )
 
 
-def variant_tensor(bundle: WakeBundle, *, scales: list[str], channels: list[str]) -> np.ndarray:
+def variant_tensor(
+    bundle: WakeBundle,
+    *,
+    scales: Sequence[str],
+    channels: Sequence[str],
+) -> np.ndarray:
     missing_scales = [scale for scale in scales if scale not in bundle.crops_by_scale]
     if missing_scales:
         raise ValueError(f"Requested scales not found in wake bundle: {missing_scales}")

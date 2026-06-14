@@ -1,0 +1,18 @@
+{
+  "assigned_re": 880,
+  "crop_mode": "model_fractions",
+  "field_size": 128,
+  "flip_y": false,
+  "groups": 45,
+  "index_csv": "/home/chenyihao/fluid_runs/piv_blueluna_linearRe_stride5/data/wake_fields/index.csv",
+  "notes": [
+    "Real PIV CSV coordinate frame is local to exported camera ROI.",
+    "Flow meter was broken; estimated_re uses top/bottom boundary-strip median U.",
+    "All rows are a validation split; do not mix frames from the same sequence."
+  ],
+  "re_by_level": "5:880,10:1760,15:2640",
+  "rows": 2700,
+  "skipped_groups": 0,
+  "source_root": "/mnt/c/Users/chenyihao/Documents/GitHub/fluid-shape-pipeline/\u84dd\u6708\u4f20\u5947/\u8ba1\u7b97\u7ed3\u679c",
+  "stride": 5
+}

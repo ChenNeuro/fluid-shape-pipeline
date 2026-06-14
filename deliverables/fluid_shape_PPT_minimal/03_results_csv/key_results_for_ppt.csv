@@ -1,0 +1,6 @@
+experiment,train_data,test_data,re_labeling,frame_accuracy,sequence_accuracy,macro_f1,slide_message
+CFD-JEPA zero-shot to real PIV,CFD stable dataset,all real PIV sequences,"old PIV metadata assigned Re=800",0.225,0.222,0.159,"Direct CFD to PIV transfer fails, showing a strong domain gap."
+PIV-only Random Forest diagnostic,"PIV seq1+seq2","PIV seq3","linear Re not used by RF",0.762,0.762,0.746,"Real PIV wake fields contain usable shape information."
+PIV-JEPA from scratch,"PIV seq1+seq2","PIV seq3","PIV speed levels treated as metadata; shape-only loss",0.871,0.867,0.870,"Best honest holdout result for presentation."
+CFD-JEPA initialized PIV fine-tune,"CFD checkpoint + PIV seq1+seq2","PIV seq3","linear Re classes 880/1760/2640 with weak Re loss",0.791,0.800,0.794,"CFD prior helps but still underperforms PIV from-scratch training."
+CFD-JEPA initialized PIV fine-tune shape-only,"CFD checkpoint + PIV seq1+seq2","PIV seq3","linear Re classes 880/1760/2640, Re loss disabled",0.714,0.733,0.733,"Shape-only fine-tune is worse, so weak Re supervision is useful."

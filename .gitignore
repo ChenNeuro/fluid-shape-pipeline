@@ -42,6 +42,7 @@ env/
 .coverage
 htmlcov/
 .tox/
+.mypy_cache/
 
 # Data (generated, not source)
 data/
@@ -61,6 +62,16 @@ logs/
 
 # Demo data
 .demo/
+
+# Local experiment inputs and generated packages
+HURRY/
+outputs/
+*.zip
+report_slides*.pptx
+蓝月传奇/
+
+# Raw PIV bundles are too large for GitHub; keep summaries/derived docs instead.
+deliverables/piv_initial_data_by_obstacle/piv_raw_*.zip
 
 # Sisyphus plans
 .sisyphus/

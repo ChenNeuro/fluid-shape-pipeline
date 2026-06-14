@@ -174,6 +174,7 @@ def main() -> None:
     idx_test = np.asarray([case_to_idx[case_id] for case_id in pack["test_case_ids"]], dtype=int)
 
     model_type = str(pack.get("model_type", "resnet18"))
+    model: torch.nn.Module
     if model_type == "mae_vit":
         from vision.mae_vit_model import MultiScaleViTWakeNet
 

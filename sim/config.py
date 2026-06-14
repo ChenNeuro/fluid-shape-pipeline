@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -26,4 +26,7 @@ def resolve_from_root(path_value: str | Path) -> Path:
 def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
     cfg_path = resolve_from_root(config_path or DEFAULT_CONFIG_PATH)
     with cfg_path.open("r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle)
+        payload = yaml.safe_load(handle)
+    if not isinstance(payload, dict):
+        raise ValueError(f"Config root must be a mapping: {cfg_path}")
+    return cast(dict[str, Any], payload)

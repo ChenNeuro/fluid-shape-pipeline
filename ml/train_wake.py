@@ -40,6 +40,29 @@ from vision.wake_dataset import WakeBundle, load_wake_bundle, variant_tensor
 from vision.wake_model import select_device
 
 
+def _select_variant_names(bundle: WakeBundle) -> tuple[str, str, dict]:
+    scale_set = set(bundle.scale_names)
+    if {"distD1.0_full", "distD2.0_full", "distD4.0_full"}.issubset(scale_set):
+        main_variant = "distD_multi_4ch"
+        single_variant = "distD_single_4ch"
+    else:
+        main_variant = "dist_multi_4ch"
+        single_variant = "dist_single_4ch"
+
+    selected = {
+        name: spec
+        for name, spec in VARIANTS.items()
+        if all(scale in scale_set for scale in spec["scales"])
+        and all(channel in bundle.channel_names for channel in spec["channels"])
+    }
+    if main_variant not in selected or single_variant not in selected:
+        raise ValueError(
+            "Wake bundle does not contain required scales/channels for selected variants: "
+            f"scales={bundle.scale_names}, channels={bundle.channel_names}"
+        )
+    return main_variant, single_variant, selected
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Train multi-scale wake-field classifiers and export comparison reports"
@@ -206,10 +229,9 @@ def _train_repeated_holdouts(
 ) -> tuple[pd.DataFrame, dict[str, list[dict[str, float]]]]:
     all_rows = []
     histories_for_plot: dict[str, list[dict[str, float]]] = {}
-    main_variant = "dist_multi_4ch"
-    single_variant = "dist_single_4ch"
+    main_variant, single_variant, selected_variants = _select_variant_names(bundle)
 
-    for variant_name, spec in VARIANTS.items():
+    for variant_name, spec in selected_variants.items():
         x_all = variant_tensor(bundle, scales=spec["scales"], channels=spec["channels"])
 
         for seed in repeat_seeds:
@@ -306,8 +328,9 @@ def _leave_one_re_out(
     val_ratio: float,
     batch_size: int,
     device,
+    main_variant: str,
 ) -> pd.DataFrame:
-    main_spec = VARIANTS["dist_multi_4ch"]
+    main_spec = VARIANTS[main_variant]
     x_main = variant_tensor(bundle, scales=main_spec["scales"], channels=main_spec["channels"])
     leave_rows = []
 
@@ -363,6 +386,7 @@ def main() -> None:
     logger = setup_logger("train_wake", paths.logs_dir / f"train_wake_{run_name}.log")
 
     bundle = load_wake_bundle(paths.wake_fields_dir)
+    main_variant, single_variant, _selected_variants = _select_variant_names(bundle)
     label_maps = build_label_maps(bundle)
     strata = stratification_labels(bundle)
     ml_cfg = cfg["ml"]
@@ -416,18 +440,20 @@ def main() -> None:
         val_ratio=val_ratio,
         batch_size=batch_size,
         device=device,
+        main_variant=main_variant,
     )
     leave_one_re_df.to_csv(reports_dir / "wake_field_leave_one_re_out.csv", index=False)
     write_wake_summary(
         output_path=reports_dir / "wake_field_summary.md",
         summary_df=summary_df,
         leave_one_re_df=leave_one_re_df,
-        main_variant="dist_multi_4ch",
-        single_variant="dist_single_4ch",
+        main_variant=main_variant,
+        single_variant=single_variant,
     )
 
     selection_payload = {
-        "main_variant": "dist_multi_4ch",
+        "main_variant": main_variant,
+        "single_variant": single_variant,
         "speed_variant": None,
         "device": str(device),
         "repeat_seeds": repeat_seeds,
@@ -442,7 +468,7 @@ def main() -> None:
     )
     logger.info(
         "Wake-field training complete. main_variant=%s summary=%s",
-        "dist_multi_4ch",
+        main_variant,
         reports_dir / "wake_field_summary.md",
     )
 

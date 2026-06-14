@@ -99,7 +99,7 @@ def _fit_predict_extra_trees(
         class_weight="balanced",
     )
     model.fit(x[idx_train], y[idx_train])
-    return model.predict(x[idx_test])
+    return np.asarray(model.predict(x[idx_test]))
 
 
 def evaluate_shortcut_baselines(

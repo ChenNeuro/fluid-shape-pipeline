@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import timm
 import torch
 import torch.nn as nn
@@ -30,6 +32,7 @@ class MAEViTEncoder(nn.Module):
         super().__init__()
         self.in_channels = in_channels
         self.model_name = model_name
+        self.backbone: Any
 
         try:
             self.backbone = timm.create_model(
@@ -50,7 +53,7 @@ class MAEViTEncoder(nn.Module):
                 bias=False,
             )
 
-        self.feature_dim = getattr(self.backbone, "num_features", 768)
+        self.feature_dim = int(getattr(self.backbone, "num_features", 768))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: [B, C, H, W] (e.g. [B, 4, 128, 128])

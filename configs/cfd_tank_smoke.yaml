@@ -1,0 +1,99 @@
+project:
+  seed: 20260605
+  experiment_id: cfd_tank_smoke
+  solver: openfoam
+  modality: cfd_wake_field
+
+simulation:
+  H: 0.45
+  d_ratio: 0.1406
+  x0: 0.25
+  y0: 0.225
+  L_in: 0.25
+  L_out: 0.60
+  density: 997.0
+  U_mean: 0.0100
+  re_values: [800]
+  shapes: [circle, triangle, airfoil, diamond, bar]
+  perturbations_per_combo: 1
+  probes_n: 32
+  workers: 0
+  max_retries: 1
+  perturb:
+    enable_dy: true
+    dy_min: 0.0
+    dy_max: 0.0
+    enable_eps: false
+    eps_max: 0.0
+  time:
+    dt: 0.002
+    transient_time: 0.5
+    min_samples: 200
+    min_cycles: 4
+
+cfd:
+  tank:
+    length_m: 0.85
+    depth_m: 0.45
+    width_m: 0.40
+  obstacle:
+    area_m2: 0.005
+    equivalent_diameter_m: 0.079788456
+    center_x_m: 0.25
+    center_y_m: 0.225
+  fluid:
+    nu_m2_s: 0.000001
+  mesh:
+    thickness_m: 0.01
+    lc_far_m: 0.012
+    lc_obstacle_m: 0.003
+  time:
+    dt_s: 0.002
+    end_time_s: 0.2
+    write_interval_s: 0.02
+  case_matrix:
+    shapes: [circle, triangle, airfoil, diamond, bar]
+    re_values: [800]
+    dy_values_m: [0.0]
+    test_dy_values_m: [0.0]
+
+ml:
+  test_size: 0.2
+  random_state: 42
+  repeat_seeds: [42]
+  n_estimators: 300
+  cv_folds: 3
+  robustness_bins: 4
+  perm_repeats: 8
+
+vision:
+  sequence_frames: 8
+  field_size: 128
+  channels: [ux, uy, speed, vorticity]
+  flow_estimator: farneback
+  scales: [distD1.0_full, distD2.0_full, distD4.0_full]
+  training:
+    epochs: 8
+    batch_size: 8
+    lr: 0.001
+    weight_decay: 0.0001
+    fusion_hidden: 128
+    dropout: 0.15
+    export_seed: 42
+    loss_weights:
+      shape: 1.0
+      params: 0.1
+      re: 0.1
+
+reconstruction:
+  image_height: 64
+  image_width: 128
+  methods: [parametric_inverse]
+  param_n_estimators: 300
+  audit_n_estimators: 200
+  param_min_samples_leaf: 1
+  latent_dim: 48
+  ridge_alpha: 1.0
+  obstacle_threshold: 0.8
+  confidence_threshold: 0.45
+  repeat_seeds: [42]

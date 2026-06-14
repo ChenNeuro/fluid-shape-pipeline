@@ -21,6 +21,7 @@ from sim.logging_utils import setup_logger
 
 META_COLS = ["case_id", "shape", "Re", "dy", "eps", "seed"]
 RECON_METHODS = {"latent_ridge", "parametric_inverse"}
+ReconstructionMetrics = dict[str, float | np.ndarray]
 
 
 def parse_args() -> argparse.Namespace:
@@ -116,7 +117,7 @@ def _multiclass_iou_from_class_maps(
 
 def _evaluate_prediction(
     y_true: np.ndarray, y_pred: np.ndarray, threshold: float
-) -> dict[str, float]:
+) -> ReconstructionMetrics:
     mse = float(mean_squared_error(y_true, y_pred))
     iou_list = []
     dice_list = []
@@ -152,6 +153,14 @@ def _evaluate_prediction(
         "miou3_wall_values": np.asarray(miou3_wall, dtype=float),
         "miou3_obstacle_values": np.asarray(miou3_obstacle, dtype=float),
     }
+
+
+def _metric_float(metrics: ReconstructionMetrics, key: str) -> float:
+    return float(metrics[key])
+
+
+def _metric_array(metrics: ReconstructionMetrics, key: str) -> np.ndarray:
+    return np.asarray(metrics[key], dtype=float)
 
 
 def _clip_params(dy: np.ndarray, eps: np.ndarray, cfg: dict) -> tuple[np.ndarray, np.ndarray]:
@@ -445,7 +454,7 @@ def _build_case_metrics_df(
     y_params_test: np.ndarray,
     y_true: np.ndarray,
     y_pred: np.ndarray,
-    metrics: dict[str, np.ndarray],
+    metrics: ReconstructionMetrics,
     aux: dict,
 ) -> pd.DataFrame:
     case_df = pd.DataFrame(
@@ -455,12 +464,12 @@ def _build_case_metrics_df(
             "Re": features_df.iloc[idx_test]["Re"].astype(int).to_numpy(),
             "dy_true": y_params_test[:, 0].astype(float),
             "eps_true": y_params_test[:, 1].astype(float),
-            "iou_obstacle": metrics["iou_values"].astype(float),
-            "dice_obstacle": metrics["dice_values"].astype(float),
-            "miou3": metrics["miou3_values"].astype(float),
-            "miou3_fluid": metrics["miou3_fluid_values"].astype(float),
-            "miou3_wall": metrics["miou3_wall_values"].astype(float),
-            "miou3_obstacle": metrics["miou3_obstacle_values"].astype(float),
+            "iou_obstacle": _metric_array(metrics, "iou_values"),
+            "dice_obstacle": _metric_array(metrics, "dice_values"),
+            "miou3": _metric_array(metrics, "miou3_values"),
+            "miou3_fluid": _metric_array(metrics, "miou3_fluid_values"),
+            "miou3_wall": _metric_array(metrics, "miou3_wall_values"),
+            "miou3_obstacle": _metric_array(metrics, "miou3_obstacle_values"),
             "mse_case": np.mean((y_true - y_pred) ** 2, axis=1).astype(float),
         }
     )
@@ -491,7 +500,7 @@ def _build_case_metrics_df(
 
 def _random_pair_metrics(
     y_true: np.ndarray, y_pred: np.ndarray, threshold: float, seed: int = 123
-) -> dict[str, float]:
+) -> ReconstructionMetrics:
     rng = np.random.default_rng(seed)
     perm = rng.permutation(y_true.shape[0])
     return _evaluate_prediction(y_true=y_true[perm], y_pred=y_pred, threshold=threshold)
@@ -499,8 +508,8 @@ def _random_pair_metrics(
 
 def _write_sanity_report(
     output_path: Path,
-    aligned_metrics: dict[str, float],
-    random_metrics: dict[str, float],
+    aligned_metrics: ReconstructionMetrics,
+    random_metrics: ReconstructionMetrics,
     case_metrics_df: pd.DataFrame,
     confidence_threshold: float | None = None,
 ) -> None:
@@ -508,20 +517,26 @@ def _write_sanity_report(
     lines.append("# Reconstruction Sanity Report")
     lines.append("")
     lines.append("## Aligned vs Random-Pair Control")
+    aligned_iou = _metric_float(aligned_metrics, "iou")
+    random_iou = _metric_float(random_metrics, "iou")
+    aligned_dice = _metric_float(aligned_metrics, "dice")
+    random_dice = _metric_float(random_metrics, "dice")
+    aligned_miou3 = _metric_float(aligned_metrics, "miou3")
+    random_miou3 = _metric_float(random_metrics, "miou3")
     lines.append(
-        f"- Obstacle IoU: aligned={aligned_metrics['iou']:.4f}, "
-        f"random_pair={random_metrics['iou']:.4f}, "
-        f"delta={aligned_metrics['iou'] - random_metrics['iou']:.4f}"
+        f"- Obstacle IoU: aligned={aligned_iou:.4f}, "
+        f"random_pair={random_iou:.4f}, "
+        f"delta={aligned_iou - random_iou:.4f}"
     )
     lines.append(
-        f"- Obstacle Dice: aligned={aligned_metrics['dice']:.4f}, "
-        f"random_pair={random_metrics['dice']:.4f}, "
-        f"delta={aligned_metrics['dice'] - random_metrics['dice']:.4f}"
+        f"- Obstacle Dice: aligned={aligned_dice:.4f}, "
+        f"random_pair={random_dice:.4f}, "
+        f"delta={aligned_dice - random_dice:.4f}"
     )
     lines.append(
-        f"- Geometry mIoU(3-class): aligned={aligned_metrics['miou3']:.4f}, "
-        f"random_pair={random_metrics['miou3']:.4f}, "
-        f"delta={aligned_metrics['miou3'] - random_metrics['miou3']:.4f}"
+        f"- Geometry mIoU(3-class): aligned={aligned_miou3:.4f}, "
+        f"random_pair={random_miou3:.4f}, "
+        f"delta={aligned_miou3 - random_miou3:.4f}"
     )
     lines.append("")
 
@@ -722,7 +737,7 @@ def main() -> None:
     n_strata = len(np.unique(strata))
     test_n = _compute_stratified_test_n(n_total, n_strata, float(cfg["ml"].get("test_size", 0.2)))
 
-    repeat_rows: list[dict[str, float]] = []
+    repeat_rows: list[dict[str, object]] = []
     for method in methods:
         for seed in repeat_seeds:
             (
@@ -781,10 +796,10 @@ def main() -> None:
                     "seed": int(seed),
                     "train_size": int(x_train.shape[0]),
                     "test_size": int(x_test.shape[0]),
-                    "mse": float(metrics["mse"]),
-                    "iou": float(metrics["iou"]),
-                    "dice": float(metrics["dice"]),
-                    "miou3": float(metrics["miou3"]),
+                    "mse": _metric_float(metrics, "mse"),
+                    "iou": _metric_float(metrics, "iou"),
+                    "dice": _metric_float(metrics, "dice"),
+                    "miou3": _metric_float(metrics, "miou3"),
                     "shape_acc": shape_acc,
                     "dy_mae": dy_mae,
                     "eps_mae": eps_mae,
@@ -866,7 +881,7 @@ def main() -> None:
     )
     _plot_iou_vs_eps(
         eps=features_df.iloc[idx_test]["eps"].to_numpy(dtype=float),
-        iou=base_metrics["iou_values"],
+        iou=_metric_array(base_metrics, "iou_values"),
         output_path=reports_dir / "reconstruction_iou_vs_eps.png",
     )
 
@@ -897,7 +912,7 @@ def main() -> None:
     if shape_conf is not None:
         _plot_confidence_vs_iou(
             shape_confidence=np.asarray(shape_conf, dtype=float),
-            iou_values=np.asarray(base_metrics["iou_values"], dtype=float),
+            iou_values=_metric_array(base_metrics, "iou_values"),
             output_path=reports_dir / "reconstruction_confidence_vs_iou.png",
         )
 
@@ -980,13 +995,13 @@ def main() -> None:
         "threshold": obstacle_threshold,
         "summary": method_summary_df.to_dict(orient="records"),
         "selected_metrics": {
-            "mse": float(base_metrics["mse"]),
-            "iou": float(base_metrics["iou"]),
-            "dice": float(base_metrics["dice"]),
-            "miou3": float(base_metrics["miou3"]),
-            "random_pair_iou": float(random_metrics["iou"]),
-            "random_pair_dice": float(random_metrics["dice"]),
-            "random_pair_miou3": float(random_metrics["miou3"]),
+            "mse": _metric_float(base_metrics, "mse"),
+            "iou": _metric_float(base_metrics, "iou"),
+            "dice": _metric_float(base_metrics, "dice"),
+            "miou3": _metric_float(base_metrics, "miou3"),
+            "random_pair_iou": _metric_float(random_metrics, "iou"),
+            "random_pair_dice": _metric_float(random_metrics, "dice"),
+            "random_pair_miou3": _metric_float(random_metrics, "miou3"),
             "shape_acc": (
                 float(np.mean(aux["shape_pred"] == y_shape_test)) if "shape_pred" in aux else None
             ),
@@ -1019,10 +1034,10 @@ def main() -> None:
     logger.info(
         "Reconstruction done. method=%s mse=%.6f iou=%.4f dice=%.4f miou3=%.4f model=%s",
         best_method,
-        base_metrics["mse"],
-        base_metrics["iou"],
-        base_metrics["dice"],
-        base_metrics["miou3"],
+        _metric_float(base_metrics, "mse"),
+        _metric_float(base_metrics, "iou"),
+        _metric_float(base_metrics, "dice"),
+        _metric_float(base_metrics, "miou3"),
         model_path,
     )
 

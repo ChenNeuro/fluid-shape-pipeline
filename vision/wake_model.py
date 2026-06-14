@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 import torch
 from torch import nn
 
@@ -30,7 +32,7 @@ class ResNet18Encoder(nn.Module):
         self.backbone = backbone
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.backbone(x)
+        return cast(torch.Tensor, self.backbone(x))
 
 
 class MultiScaleWakeNet(nn.Module):
@@ -115,6 +117,7 @@ class MultiScaleJEPAModel(nn.Module):
         fusion_hidden: int = 192,
         dropout: float = 0.15,
         pretrained_encoder: nn.Module | None = None,
+        encoder_norm: str = "batch",
     ):
         super().__init__()
         self.n_scales = int(n_scales)
@@ -124,12 +127,17 @@ class MultiScaleJEPAModel(nn.Module):
         self.feature_dim = int(feature_dim)
         self.fusion_hidden = int(fusion_hidden)
         self.dropout = float(dropout)
+        self.encoder_norm = str(encoder_norm)
         if pretrained_encoder is not None:
             self.encoder = pretrained_encoder
         else:
             from vision.jepa_encoder import LightweightCNNEncoder
 
-            self.encoder = LightweightCNNEncoder(in_channels=in_channels, feature_dim=feature_dim)
+            self.encoder = LightweightCNNEncoder(
+                in_channels=in_channels,
+                feature_dim=feature_dim,
+                norm=encoder_norm,
+            )
 
         fused_dim = feature_dim * self.n_scales
         self.fusion = nn.Sequential(

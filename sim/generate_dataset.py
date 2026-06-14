@@ -101,7 +101,8 @@ def build_index_rows(manifest_df: pd.DataFrame, solver_name: str) -> list[dict]:
 
         if row["status"] == "success" and row["metadata_json"]:
             try:
-                payload = json.loads(Path(row["metadata_json"]).read_text(encoding="utf-8"))
+                metadata_path = Path(str(row["metadata_json"]))
+                payload = json.loads(metadata_path.read_text(encoding="utf-8"))
                 probes = payload.get("probes", {})
                 sampling = payload.get("sampling", {})
                 row.update(

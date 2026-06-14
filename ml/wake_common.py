@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TypedDict
 
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score
@@ -26,6 +27,16 @@ VARIANTS = {
         "channels": ["ux", "uy", "speed", "vorticity"],
         "description": "Multi-distance (0.5h/1.0h/2.0h), all full-height",
     },
+    "distD_single_4ch": {
+        "scales": ["distD2.0_full"],
+        "channels": ["ux", "uy", "speed", "vorticity"],
+        "description": "Single distance (2.0D), full-height crop",
+    },
+    "distD_multi_4ch": {
+        "scales": ["distD1.0_full", "distD2.0_full", "distD4.0_full"],
+        "channels": ["ux", "uy", "speed", "vorticity"],
+        "description": "Multi-distance (1.0D/2.0D/4.0D), all full-height",
+    },
 }
 
 
@@ -35,6 +46,13 @@ class LabelMaps:
     idx_to_shape: dict[int, str]
     re_to_idx: dict[int, int]
     idx_to_re: dict[int, int]
+
+
+class ObstacleMetrics(TypedDict):
+    iou_mean: float
+    dice_mean: float
+    iou_values: np.ndarray
+    dice_values: np.ndarray
 
 
 def build_label_maps(bundle: WakeBundle) -> LabelMaps:
@@ -127,7 +145,7 @@ def clip_params(
 
 def obstacle_iou_and_dice(
     targets: np.ndarray, predictions: np.ndarray, threshold: float
-) -> dict[str, np.ndarray | float]:
+) -> ObstacleMetrics:
     target_mask = targets >= threshold
     pred_mask = predictions >= threshold
 

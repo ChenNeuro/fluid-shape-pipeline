@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, cast
 
 import cv2
 import numpy as np
 import pandas as pd
 
 from sim.data_schema import PROBES_FILENAME, WAKE_FRAMES_FILENAME, write_metadata
+
+_EQ_AREA_BETA_PER_D_RATIO2 = 1.25
 
 
 class SyntheticSimulator:
@@ -38,11 +41,11 @@ class SyntheticSimulator:
         self.field_size = int(self.vision_cfg.get("field_size", 128))
         self.channels = list(self.vision_cfg.get("channels", ["ux", "uy", "speed", "vorticity"]))
 
-    def _shape_params(self, shape: str) -> dict:
+    def _shape_params(self, shape: str) -> dict[str, Any]:
         params = self.synthetic_cfg["shape_params"].get(shape)
         if params is None:
             raise ValueError(f"Unsupported shape for synthetic solver: {shape}")
-        return params
+        return cast(dict[str, Any], params)
 
     def _shape_profile(self, shape: str) -> dict[str, float]:
         profiles = {
@@ -150,7 +153,7 @@ class SyntheticSimulator:
                 -((y_norm - 0.68) ** 2) / (2.0 * 0.07**2)
             )
             mode = 0.45 + 0.55 * center + 0.25 * shoulders
-            return np.clip(mode, 0.10, None)
+            return np.asarray(np.clip(mode, 0.10, None))
         raise ValueError(f"Unsupported shape: {shape}")
 
     def _should_emit_wake_frames(self) -> bool:
@@ -236,8 +239,8 @@ class SyntheticSimulator:
         v_field = np.where(inside, v_field, 0.0)
 
         mask = inside.astype(np.float32)
-        mask = cv2.GaussianBlur(mask, (0, 0), sigmaX=0.9, sigmaY=0.9)
-        mask = np.clip(mask, 0.0, 1.0)
+        mask_blurred = cv2.GaussianBlur(mask, (0, 0), sigmaX=0.9, sigmaY=0.9)
+        mask = np.asarray(np.clip(mask_blurred, 0.0, 1.0), dtype=np.float32)
         return u_field.astype(np.float32), v_field.astype(np.float32), mask.astype(np.float32)
 
     @staticmethod
@@ -248,8 +251,8 @@ class SyntheticSimulator:
         dots = rng.random((height, width)) < density
         if np.any(dots):
             texture[dots] = rng.uniform(0.45, 1.0, size=int(np.sum(dots))).astype(np.float32)
-        texture = cv2.GaussianBlur(texture, (0, 0), sigmaX=blur_sigma, sigmaY=blur_sigma)
-        return np.clip(texture, 0.0, 1.0)
+        texture_blurred = cv2.GaussianBlur(texture, (0, 0), sigmaX=blur_sigma, sigmaY=blur_sigma)
+        return np.asarray(np.clip(texture_blurred, 0.0, 1.0), dtype=np.float32)
 
     def _render_wake_frames(
         self, case_spec, rng: np.random.Generator, t_sample: np.ndarray, f0: float, amp_base: float
@@ -266,8 +269,11 @@ class SyntheticSimulator:
         frame_gap = float(np.clip(0.08 / max(f0, 0.08), 0.015, 0.05))
         stride = max(1, int(round(frame_gap / dt)))
         start_idx = max(0, t_sample.size - 1 - stride * (self.sequence_frames - 1))
-        sample_indices = start_idx + stride * np.arange(self.sequence_frames, dtype=int)
-        sample_indices = np.clip(sample_indices, 0, t_sample.size - 1)
+        sample_indices_raw = start_idx + stride * np.arange(self.sequence_frames, dtype=int)
+        sample_indices = np.asarray(
+            np.clip(sample_indices_raw, 0, t_sample.size - 1),
+            dtype=int,
+        )
         frame_times = t_sample[sample_indices]
 
         height = self.field_size
@@ -427,11 +433,12 @@ class SyntheticSimulator:
         if challenge_enabled:
             probe_mix = float(self.challenge_cfg.get("probe_mix", 0.0))
             if probe_mix > 0.0:
-                u_total = (
+                mixed = (
                     (1.0 - probe_mix) * u_total
                     + 0.5 * probe_mix * np.roll(u_total, shift=1, axis=1)
                     + 0.5 * probe_mix * np.roll(u_total, shift=-1, axis=1)
                 )
+                u_total[:, :] = np.asarray(mixed, dtype=float)
 
             dropout_prob = float(self.challenge_cfg.get("dropout_prob", 0.0))
             dropout_std = float(self.challenge_cfg.get("dropout_std", 0.0))
@@ -458,6 +465,15 @@ class SyntheticSimulator:
             "geometry": {
                 "H": float(self.h),
                 "d": float(self.d),
+                "beta_area": float(_EQ_AREA_BETA_PER_D_RATIO2 * (self.d / self.h) ** 2),
+                "equivalent_diameter": float(
+                    np.sqrt(
+                        4.0
+                        * (_EQ_AREA_BETA_PER_D_RATIO2 * (self.d / self.h) ** 2)
+                        * self.h**2
+                        / np.pi
+                    )
+                ),
                 "x0": float(self.x0),
                 "y0_nominal": float(self.y0),
                 "y0_actual": float(self.y0) + float(case_spec.dy),

@@ -23,34 +23,35 @@ where U is the characteristic inlet velocity and nu is the kinematic viscosity.
 import argparse
 import math
 from collections.abc import Iterable
+from typing import Any
+
+MetricValue = float | None
 
 
 def _naca_integral(thickness_ratio: float = 0.14) -> float:
     """Return the NACA 00xx area coefficient A / chord^2."""
-    integral = (
-        0.2969 * 2.0 / 3.0
-        - 0.1260 * 0.5
-        - 0.3516 * 1.0 / 3.0
-        + 0.2843 * 0.25
-        - 0.1015 * 0.2
-    )
+    integral = 0.2969 * 2.0 / 3.0 - 0.1260 * 0.5 - 0.3516 * 1.0 / 3.0 + 0.2843 * 0.25 - 0.1015 * 0.2
     return 2.0 * 5.0 * thickness_ratio * integral
 
 
 def design_obstacles(
     H: float,
-    blockage_ratio: float = 0.04,
+    blockage_ratio: float = 0.005,
     airfoil_thickness: float = 0.14,
+    span: float | None = None,
     nu: float | None = None,
     velocity: float | None = None,
     target_re: float | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Compute equal-area obstacle dimensions.
 
     Args:
         H: channel height in meters.
-        blockage_ratio: in-plane area ratio A/H^2.
+        blockage_ratio: in-plane area ratio A/H^2. This is kept for backward
+            compatibility; the physical tunnel blockage is shape-dependent and
+            reported separately as crossflow_extent/H.
         airfoil_thickness: NACA symmetric airfoil thickness ratio.
+        span: optional model span or water depth in meters.
         nu: fluid kinematic viscosity in m^2/s.
         velocity: characteristic inlet velocity in m/s.
         target_re: optional target Reynolds number based on D_eq.
@@ -62,8 +63,11 @@ def design_obstacles(
         raise ValueError("H must be positive")
     if blockage_ratio <= 0:
         raise ValueError("blockage_ratio must be positive")
+    if span is not None and span <= 0:
+        raise ValueError("span must be positive when provided")
 
-    area = blockage_ratio * H**2
+    area_ratio = blockage_ratio
+    area = area_ratio * H**2
     d_eq = math.sqrt(4.0 * area / math.pi)
 
     circle = {"diameter": d_eq, "radius": 0.5 * d_eq}
@@ -135,9 +139,43 @@ def design_obstacles(
     if nu is not None and target_re is not None:
         flow["velocity_for_target_re"] = target_re * nu / d_eq
 
+    extents: dict[str, dict[str, float]] = {
+        "circle": {
+            "streamwise": d_eq,
+            "crossflow": d_eq,
+        },
+        "triangle": {
+            "streamwise": tri_height,
+            "crossflow": tri_side,
+        },
+        "airfoil": {
+            "streamwise": chord,
+            "crossflow": chord * airfoil_thickness,
+        },
+        "diamond": {
+            "streamwise": diamond_width,
+            "crossflow": diamond_height,
+        },
+        "bar": {
+            "streamwise": bar_width,
+            "crossflow": bar_height,
+        },
+    }
+    diagnostics: dict[str, dict[str, MetricValue]] = {}
+    for shape, values in extents.items():
+        streamwise = values["streamwise"]
+        crossflow = values["crossflow"]
+        diagnostics[shape] = {
+            "streamwise_over_H": streamwise / H,
+            "crossflow_over_H": crossflow / H,
+            "span_over_streamwise": (span / streamwise) if span is not None else None,
+            "span_over_crossflow": (span / crossflow) if span is not None else None,
+        }
+
     return {
         "channel_height": H,
-        "area_ratio": blockage_ratio,
+        "span": span,
+        "area_ratio": area_ratio,
         "target_area": area,
         "D_eq": d_eq,
         "D_eq_over_H": d_eq / H,
@@ -147,6 +185,7 @@ def design_obstacles(
         "diamond": diamond,
         "bar": bar,
         "flow": flow,
+        "diagnostics": diagnostics,
     }
 
 
@@ -164,6 +203,8 @@ def _parse_betas(value: str) -> list[float]:
 
 def print_design(design: dict) -> None:
     area = design["target_area"]
+    print("# Units: internal SI (m, m^2); printed manufacturing dimensions are mm/mm^2")
+    print("# CAD note: set the document/import unit to millimeters before entering these numbers")
     print(f"# Channel height H = {design['channel_height']:.4f} m")
     print(
         "# Area ratio beta_area = A/H^2 = "
@@ -172,20 +213,16 @@ def print_design(design: dict) -> None:
     print(f"# Target area A = {area:.6f} m^2 = {_mm2(area)}")
     print(f"# Equivalent diameter D_eq = {_mm(design['D_eq'])}")
     print(f"# D_eq/H = {design['D_eq_over_H']:.4f}")
+    if design["span"] is not None:
+        print(f"# Span/depth = {_mm(design['span'])}")
 
     flow = design["flow"]
     if flow["nu"] is not None:
         print(f"# Fluid kinematic viscosity nu = {flow['nu']:.3e} m^2/s")
     if flow["re_at_velocity"] is not None:
-        print(
-            f"# Re at U={flow['velocity']:.4f} m/s: "
-            f"{flow['re_at_velocity']:.1f}"
-        )
+        print(f"# Re at U={flow['velocity']:.4f} m/s: " f"{flow['re_at_velocity']:.1f}")
     if flow["velocity_for_target_re"] is not None:
-        print(
-            f"# U for Re={flow['target_re']:.1f}: "
-            f"{flow['velocity_for_target_re']:.5f} m/s"
-        )
+        print(f"# U for Re={flow['target_re']:.1f}: " f"{flow['velocity_for_target_re']:.5f} m/s")
 
     print()
     print("=" * 78)
@@ -212,6 +249,30 @@ def print_design(design: dict) -> None:
         f"{'h = ' + _mm(design['bar']['height']):<22} {_mm2(area):>14}"
     )
     print("=" * 78)
+    print()
+    print("2D / blockage diagnostics")
+    print("=" * 78)
+    print(
+        f"{'Shape':<12} {'streamwise/H':>14} {'crossflow/H':>14} "
+        f"{'span/stream':>14} {'span/cross':>14}"
+    )
+    print("=" * 78)
+    for shape in ("circle", "triangle", "airfoil", "diamond", "bar"):
+        diag = design["diagnostics"][shape]
+        span_stream = diag["span_over_streamwise"]
+        span_cross = diag["span_over_crossflow"]
+        span_stream_text = f"{span_stream:.2f}" if span_stream is not None else "--"
+        span_cross_text = f"{span_cross:.2f}" if span_cross is not None else "--"
+        print(
+            f"{shape:<12} "
+            f"{diag['streamwise_over_H'] * 100:13.1f}% "
+            f"{diag['crossflow_over_H'] * 100:13.1f}% "
+            f"{span_stream_text:>14} "
+            f"{span_cross_text:>14}"
+        )
+    print("=" * 78)
+    print("# crossflow/H is the usual full-span 2D blockage proxy.")
+    print("# For quasi-2D behavior, prefer low crossflow/H and large span/stream.")
 
 
 def print_sweep(
@@ -221,6 +282,7 @@ def print_sweep(
     nu: float | None,
     velocity: float | None,
     target_re: float | None,
+    span: float | None = None,
 ) -> None:
     header = [
         "beta_area",
@@ -230,6 +292,8 @@ def print_sweep(
         "airfoil_c_mm",
         "bar_w_mm",
         "bar_h_mm",
+        "max_crossflow/H",
+        "airfoil_span/chord",
     ]
     if nu is not None and velocity is not None:
         header.append("Re_at_U")
@@ -244,7 +308,11 @@ def print_sweep(
             nu=nu,
             velocity=velocity,
             target_re=target_re,
+            span=span,
         )
+        diagnostics = design["diagnostics"]
+        max_crossflow = max(item["crossflow_over_H"] for item in diagnostics.values())
+        airfoil_span_chord = diagnostics["airfoil"]["span_over_streamwise"]
         row: list[str] = [
             f"{beta:.4f}",
             f"{design['D_eq_over_H']:.4f}",
@@ -253,6 +321,8 @@ def print_sweep(
             f"{design['airfoil']['chord'] * 1000.0:.1f}",
             f"{design['bar']['width'] * 1000.0:.1f}",
             f"{design['bar']['height'] * 1000.0:.1f}",
+            f"{max_crossflow:.4f}",
+            f"{airfoil_span_chord:.2f}" if airfoil_span_chord is not None else "",
         ]
         flow = design["flow"]
         if flow["re_at_velocity"] is not None:
@@ -266,17 +336,54 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Design equal-area obstacles and flow-compatible beta sweeps"
     )
-    parser.add_argument("--H", type=float, default=1.0, help="Channel height in meters")
+    height_group = parser.add_mutually_exclusive_group()
+    height_group.add_argument(
+        "--H",
+        type=float,
+        default=None,
+        help="Channel height in meters, e.g. 0.40 for a 40 cm tank width",
+    )
+    height_group.add_argument(
+        "--H-cm",
+        type=float,
+        default=None,
+        help="Channel height in centimeters, e.g. 40 for a 40 cm tank width",
+    )
+    height_group.add_argument(
+        "--H-mm",
+        type=float,
+        default=None,
+        help="Channel height in millimeters, e.g. 400 for a 40 cm tank width",
+    )
+    span_group = parser.add_mutually_exclusive_group()
+    span_group.add_argument(
+        "--span",
+        type=float,
+        default=None,
+        help="Model span or water depth in meters, e.g. 0.45",
+    )
+    span_group.add_argument(
+        "--span-cm",
+        type=float,
+        default=None,
+        help="Model span or water depth in centimeters, e.g. 45",
+    )
+    span_group.add_argument(
+        "--span-mm",
+        type=float,
+        default=None,
+        help="Model span or water depth in millimeters, e.g. 450",
+    )
     parser.add_argument(
         "--beta",
         type=float,
-        default=0.04,
-        help="Area ratio A/H^2, e.g. 0.04 for 4%%",
+        default=0.005,
+        help="Area ratio A/H^2, e.g. 0.005 for 0.5%%",
     )
     parser.add_argument(
         "--sweep-beta",
         default=None,
-        help="Comma-separated beta_area values, e.g. 0.02,0.03,0.04,0.05",
+        help="Comma-separated beta_area values, e.g. 0.004,0.005,0.006",
     )
     parser.add_argument(
         "--nu",
@@ -297,21 +404,35 @@ def main() -> None:
         help="Target Reynolds number based on D_eq",
     )
     args = parser.parse_args()
+    if args.H_cm is not None:
+        channel_height_m = args.H_cm / 100.0
+    elif args.H_mm is not None:
+        channel_height_m = args.H_mm / 1000.0
+    else:
+        channel_height_m = 1.0 if args.H is None else args.H
+    if args.span_cm is not None:
+        span_m = args.span_cm / 100.0
+    elif args.span_mm is not None:
+        span_m = args.span_mm / 1000.0
+    else:
+        span_m = args.span
 
     if args.sweep_beta:
         print_sweep(
-            H=args.H,
+            H=channel_height_m,
             betas=_parse_betas(args.sweep_beta),
             nu=args.nu,
             velocity=args.velocity,
             target_re=args.target_re,
+            span=span_m,
         )
         return
 
     print_design(
         design_obstacles(
-            H=args.H,
+            H=channel_height_m,
             blockage_ratio=args.beta,
+            span=span_m,
             nu=args.nu,
             velocity=args.velocity,
             target_re=args.target_re,

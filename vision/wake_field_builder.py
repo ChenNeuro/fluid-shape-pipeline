@@ -31,10 +31,11 @@ def _estimate_pairwise_flow(frames: np.ndarray, estimator: str) -> np.ndarray:
     for idx in range(frames.shape[0] - 1):
         prev = _to_uint8(frames[idx])
         nxt = _to_uint8(frames[idx + 1])
+        initial_flow = np.zeros((prev.shape[0], prev.shape[1], 2), dtype=np.float32)
         flow = cv2.calcOpticalFlowFarneback(
             prev,
             nxt,
-            None,
+            initial_flow,
             pyr_scale=0.5,
             levels=3,
             winsize=21,
@@ -43,7 +44,7 @@ def _estimate_pairwise_flow(frames: np.ndarray, estimator: str) -> np.ndarray:
             poly_sigma=1.5,
             flags=cv2.OPTFLOW_FARNEBACK_GAUSSIAN,
         )
-        flows.append(flow.astype(np.float32))
+        flows.append(np.asarray(flow, dtype=np.float32))
     return np.stack(flows, axis=0)
 
 
@@ -78,19 +79,28 @@ def _hotspot_box(vorticity: np.ndarray) -> list[float]:
     return [x0 / width, y0 / height, x1 / width, y1 / height]
 
 
-def parse_distance_scale(name: str) -> tuple[float, str] | None:
-    """Parse 'dist1.0_full', 'dist0.5_half' etc. Returns (downstream_h, height_mode) or None."""
+def parse_distance_scale(name: str) -> tuple[str, float, str] | None:
+    """Parse distance crop names.
+
+    Supported names:
+    - dist1.0_full: start 1.0 channel heights downstream from the wake canvas start.
+    - distD2.0_full: start 2.0 equivalent obstacle diameters downstream.
+    """
     prefix = "dist"
-    if not name.startswith(prefix):
+    unit = "H"
+    if name.startswith("distD"):
+        prefix = "distD"
+        unit = "D"
+    elif not name.startswith(prefix):
         return None
     rest = name[len(prefix) :]
     parts = rest.rsplit("_", 1)
     if len(parts) != 2:
         return None
     try:
-        downstream_h = float(parts[0])
+        downstream = float(parts[0])
         height_mode = parts[1]
-        return downstream_h, height_mode
+        return unit, downstream, height_mode
     except ValueError:
         return None
 
@@ -133,6 +143,7 @@ def build_crop_boxes(
     scales: list[str],
     *,
     physical_h: float,
+    physical_obstacle_d: float | None = None,
     canvas_x_start: float = 0.0,
     canvas_x_end: float = 1.0,
     canvas_y_min: float = 0.0,
@@ -142,11 +153,16 @@ def build_crop_boxes(
     for scale in scales:
         parsed = parse_distance_scale(scale)
         if parsed is not None:
-            downstream_h, height_mode = parsed
+            unit, downstream, height_mode = parsed
+            distance_length = (
+                float(physical_obstacle_d)
+                if unit == "D" and physical_obstacle_d is not None
+                else physical_h
+            )
             boxes[scale] = build_distance_crop_box(
-                downstream_h=downstream_h,
+                downstream_h=downstream,
                 height_mode=height_mode,
-                physical_h=physical_h,
+                physical_h=distance_length,
                 canvas_x_start=canvas_x_start,
                 canvas_x_end=canvas_x_end,
                 canvas_y_min=canvas_y_min,
@@ -220,6 +236,8 @@ def build_case_wake_field(case_dir: Path, cfg: dict) -> dict:
     # wake_roi lives in metadata.json (written by synthetic_solver), not in frames npz
     metadata_for_roi = read_metadata(case_dir)
     wake_roi_meta = metadata_for_roi.get("wake_roi", {})
+    geometry_meta = metadata_for_roi.get("geometry", {})
+    obstacle_d = geometry_meta.get("equivalent_diameter", geometry_meta.get("d"))
     canvas_x_start = float(wake_roi_meta.get("x_min", 0.0))
     canvas_x_end = float(wake_roi_meta.get("x_max", 1.0))
     canvas_y_min = float(wake_roi_meta.get("y_min", 0.0))
@@ -228,6 +246,7 @@ def build_case_wake_field(case_dir: Path, cfg: dict) -> dict:
         field_raw[vorticity_idx],
         scales=scales,
         physical_h=float(cfg["simulation"]["H"]),
+        physical_obstacle_d=float(obstacle_d) if obstacle_d is not None else None,
         canvas_x_start=canvas_x_start,
         canvas_x_end=canvas_x_end,
         canvas_y_min=canvas_y_min,

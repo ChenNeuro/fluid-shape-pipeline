@@ -60,7 +60,9 @@ def main() -> None:
             continue
 
         try:
-            rows.append(build_case_wake_field(case_dir, cfg))
+            row = build_case_wake_field(case_dir, cfg)
+            row["domain"] = str(item.get("domain", item.get("solver", "synthetic")))
+            rows.append(row)
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning("Wake-field build failed for %s: %s", case_id, exc)
             skipped += 1

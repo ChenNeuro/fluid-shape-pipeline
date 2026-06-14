@@ -95,8 +95,8 @@ def _evaluate_repeats(
     strata: np.ndarray,
     test_n: int,
     seeds: list[int],
-) -> tuple[list[dict], dict[str, float]]:
-    rows = []
+) -> tuple[list[dict[str, object]], dict[str, object]]:
+    rows: list[dict[str, object]] = []
     for seed in seeds:
         x_train, x_test, y_train, y_test = train_test_split(
             x,
@@ -385,7 +385,7 @@ def main() -> None:
     models_dir = paths.models_dir
     models_dir.mkdir(parents=True, exist_ok=True)
     model_path = models_dir / "sota.pkl"
-    with model_path.open("wb") as handle:
+    with model_path.open("wb") as model_handle:
         pickle.dump(
             {
                 "model": best_model,
@@ -396,17 +396,17 @@ def main() -> None:
                 "leaderboard": leaderboard.to_dict(orient="records"),
                 "config": cfg,
             },
-            handle,
+            model_handle,
         )
 
-    with (reports_dir / "sota_selection.json").open("w", encoding="utf-8") as handle:
+    with (reports_dir / "sota_selection.json").open("w", encoding="utf-8") as json_handle:
         json.dump(
             {
                 "best_model": best_model_name,
                 "holdout_metrics": holdout_metrics,
                 "leaderboard_top": leaderboard.head(4).to_dict(orient="records"),
             },
-            handle,
+            json_handle,
             indent=2,
         )
 

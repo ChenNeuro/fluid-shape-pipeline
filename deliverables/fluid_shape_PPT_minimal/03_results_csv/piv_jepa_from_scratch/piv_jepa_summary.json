@@ -1,0 +1,57 @@
+{
+  "piv_run_dir": "/home/chenyihao/fluid_runs/piv_blueluna_validation_stride5",
+  "output_run_dir": "/home/chenyihao/fluid_runs/piv_jepa_seq12_test3_stride5",
+  "model_path": "/home/chenyihao/fluid_runs/piv_jepa_seq12_test3_stride5/models/wake_field_main_piv_jepa.pt",
+  "variant": "distD_multi_4ch",
+  "device": "cuda",
+  "train_rows": 1800,
+  "test_rows": 900,
+  "train_sequences": "1,2",
+  "test_sequences": "3",
+  "train_all": false,
+  "speed_levels": "all",
+  "shape_labels": [
+    "airfoil",
+    "bar",
+    "circle",
+    "diamond",
+    "triangle"
+  ],
+  "re_values": [
+    800
+  ],
+  "metrics": [
+    {
+      "split": "train",
+      "level": "frame",
+      "n": 1800.0,
+      "accuracy": 1.0,
+      "macro_f1": 1.0
+    },
+    {
+      "split": "train",
+      "level": "sequence",
+      "n": 30.0,
+      "accuracy": 1.0,
+      "macro_f1": 1.0
+    },
+    {
+      "split": "test",
+      "level": "frame",
+      "n": 900.0,
+      "accuracy": 0.8711111111111111,
+      "macro_f1": 0.8697663971889515
+    },
+    {
+      "split": "test",
+      "level": "sequence",
+      "n": 15.0,
+      "accuracy": 0.8666666666666667,
+      "macro_f1": 0.8699999999999999
+    }
+  ],
+  "notes": [
+    "The evaluation split is by independent sequence, not random frames.",
+    "Re loss is disabled by default; shape classification is the primary task."
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "checkpoint": "/home/chenyihao/fluid_runs/cfd_final_stable175_tau6_all_jepa_gn/models/wake_field_main_cfd_finetuned.pt",
+  "piv_run_dir": "/home/chenyihao/fluid_runs/piv_blueluna_linearRe_stride5",
+  "output_run_dir": "/home/chenyihao/fluid_runs/piv_jepa_cfd_init_linearRe_seq12_test3",
+  "model_path": "/home/chenyihao/fluid_runs/piv_jepa_cfd_init_linearRe_seq12_test3/models/wake_field_main_piv_from_checkpoint.pt",
+  "variant": "distD_multi_4ch",
+  "device": "cuda",
+  "shape_labels": [
+    "airfoil",
+    "bar",
+    "circle",
+    "diamond",
+    "triangle"
+  ],
+  "re_values": [
+    880,
+    1760,
+    2640
+  ],
+  "checkpoint_load": {
+    "loaded_keys": 26,
+    "skipped_keys": [
+      "re_head.weight",
+      "re_head.bias"
+    ],
+    "missing_keys": [
+      "re_head.weight",
+      "re_head.bias"
+    ],
+    "unexpected_keys": []
+  },
+  "metrics": [
+    {
+      "split": "train",
+      "level": "frame",
+      "n": 1800.0,
+      "accuracy": 1.0,
+      "macro_f1": 1.0
+    },
+    {
+      "split": "train",
+      "level": "sequence",
+      "n": 30.0,
+      "accuracy": 1.0,
+      "macro_f1": 1.0
+    },
+    {
+      "split": "test",
+      "level": "frame",
+      "n": 900.0,
+      "accuracy": 0.7911111111111111,
+      "macro_f1": 0.7935147351490548
+    },
+    {
+      "split": "test",
+      "level": "sequence",
+      "n": 15.0,
+      "accuracy": 0.8,
+      "macro_f1": 0.7942857142857143
+    }
+  ],
+  "notes": [
+    "Fine-tuning uses only the selected train sequences.",
+    "The test sequence is evaluated after training and is not used for early stopping.",
+    "Re and geometry losses are disabled by default for real PIV shape fine-tuning."
+  ]
+}

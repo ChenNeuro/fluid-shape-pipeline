@@ -1,0 +1,6 @@
+,airfoil,bar,circle,diamond,triangle
+airfoil,180,0,0,0,0
+bar,0,179,0,1,0
+circle,0,0,113,0,67
+diamond,0,50,55,64,11
+triangle,0,0,30,0,150

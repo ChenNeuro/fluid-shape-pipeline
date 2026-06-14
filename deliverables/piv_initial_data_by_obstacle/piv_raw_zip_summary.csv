@@ -1,0 +1,6 @@
+﻿"shape_cn","shape_en","zip_name","source_dirs","csv_count","raw_size_mb","zip_size_mb"
+"圆","circle","piv_raw_circle_圆.zip","9","2691","331.38","125.92"
+"三角","triangle","piv_raw_triangle_三角.zip","9","2691","330.55","126.84"
+"机翼","airfoil","piv_raw_airfoil_机翼.zip","9","2691","332.76","119.38"
+"菱形","diamond","piv_raw_diamond_菱形.zip","9","2691","329.47","125.94"
+"长方","bar","piv_raw_bar_长方.zip","9","2691","331.48","121.85"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, cast
 
 PROBES_FILENAME = "probes.csv"
 LEGACY_PROBES_FILENAME = "probe_u.csv"
@@ -40,16 +41,19 @@ def find_metadata_json(case_dir: Path) -> Path:
     )
 
 
-def write_metadata(case_dir: Path, payload: dict) -> Path:
+def write_metadata(case_dir: Path, payload: dict[str, Any]) -> Path:
     case_dir.mkdir(parents=True, exist_ok=True)
     output = case_dir / METADATA_FILENAME
     output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return output
 
 
-def read_metadata(case_dir: Path) -> dict:
+def read_metadata(case_dir: Path) -> dict[str, Any]:
     path = find_metadata_json(case_dir)
-    return json.loads(path.read_text(encoding="utf-8"))
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Metadata root must be a mapping: {path}")
+    return cast(dict[str, Any], payload)
 
 
 def find_wake_frames_npz(case_dir: Path) -> Path:

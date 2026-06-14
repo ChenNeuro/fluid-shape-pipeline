@@ -1,0 +1,6 @@
+,airfoil,bar,circle,diamond,triangle
+airfoil,0,0,9,0,0
+bar,0,0,9,0,0
+circle,0,0,4,5,0
+diamond,0,0,3,5,1
+triangle,0,0,1,7,1

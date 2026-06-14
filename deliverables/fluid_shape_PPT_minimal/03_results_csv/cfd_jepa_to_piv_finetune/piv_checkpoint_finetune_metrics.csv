@@ -1,0 +1,5 @@
+split,level,n,accuracy,macro_f1
+train,frame,1800.0,1.0,1.0
+train,sequence,30.0,1.0,1.0
+test,frame,900.0,0.7911111111111111,0.7935147351490548
+test,sequence,15.0,0.8,0.7942857142857143

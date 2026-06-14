@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import math
+from typing import cast
 
 import torch
 import torch.nn as nn
@@ -14,36 +16,48 @@ class LightweightCNNEncoder(nn.Module):
     For supervised fine-tuning global-average-pooled to [B, D].
     """
 
-    def __init__(self, in_channels: int = 4, feature_dim: int = 192):
+    def __init__(self, in_channels: int = 4, feature_dim: int = 192, norm: str = "batch"):
         super().__init__()
         self.feature_dim = int(feature_dim)
+        self.norm = str(norm)
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels, 32, 3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(32),
+            _norm2d(32, self.norm),
             nn.ReLU(inplace=True),
             nn.Conv2d(32, 64, 3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(64),
+            _norm2d(64, self.norm),
             nn.ReLU(inplace=True),
             nn.Conv2d(64, 96, 3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(96),
+            _norm2d(96, self.norm),
             nn.ReLU(inplace=True),
             nn.Conv2d(96, 128, 3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(128),
+            _norm2d(128, self.norm),
             nn.ReLU(inplace=True),
             nn.Conv2d(128, 160, 3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(160),
+            _norm2d(160, self.norm),
             nn.ReLU(inplace=True),
             nn.Conv2d(160, self.feature_dim, 3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(self.feature_dim),
+            _norm2d(self.feature_dim, self.norm),
             nn.ReLU(inplace=True),
         )
 
     def forward_feature_map(self, x: torch.Tensor) -> torch.Tensor:
-        return self.conv(x)
+        return cast(torch.Tensor, self.conv(x))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        fm = self.conv(x)
+        fm = cast(torch.Tensor, self.conv(x))
         return fm.mean(dim=[2, 3])
+
+
+def _norm2d(channels: int, norm: str) -> nn.Module:
+    if norm == "batch":
+        return nn.BatchNorm2d(channels)
+    if norm == "group":
+        groups = math.gcd(8, channels)
+        return nn.GroupNorm(groups, channels)
+    if norm == "identity":
+        return nn.Identity()
+    raise ValueError(f"Unsupported CNN normalization: {norm}")
 
 
 class IJEPAPretrainer(nn.Module):
@@ -55,7 +69,7 @@ class IJEPAPretrainer(nn.Module):
 
     def __init__(
         self,
-        encoder: nn.Module,
+        encoder: LightweightCNNEncoder,
         feature_dim: int,
         *,
         proj_dim: int = 128,
@@ -69,8 +83,8 @@ class IJEPAPretrainer(nn.Module):
         self.momentum = float(momentum)
         self.feature_dim = int(feature_dim)
 
-        self.context_encoder = encoder
-        self.target_encoder = copy.deepcopy(encoder)
+        self.context_encoder: LightweightCNNEncoder = encoder
+        self.target_encoder: LightweightCNNEncoder = copy.deepcopy(encoder)
         for p in self.target_encoder.parameters():
             p.requires_grad = False
 
@@ -117,11 +131,11 @@ class IJEPAPretrainer(nn.Module):
         x_masked, mask_pixels = self.random_block_mask(x)
 
         ctx_fm = self.context_encoder.forward_feature_map(x_masked)
-        pred_fm = self.predictor(ctx_fm)
+        pred_fm = cast(torch.Tensor, self.predictor(ctx_fm))
 
         with torch.no_grad():
             tgt_fm = self.target_encoder.forward_feature_map(x)
-            tgt_proj = self.target_projector(tgt_fm)
+            tgt_proj = cast(torch.Tensor, self.target_projector(tgt_fm))
 
         weight = self._mask_loss_weight(mask_pixels, tgt_fm.shape[2], tgt_fm.shape[3])
         diff = (pred_fm - tgt_proj).pow(2).mean(dim=1, keepdim=True)
